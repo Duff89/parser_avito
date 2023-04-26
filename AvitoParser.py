@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Поиск бесплатных вещей на avito.ru
+AvitoParser - Поиск бесплатных вещей на avito.ru
 by Duff89 (https://github.com/Duff89)
 """
 __version__ = 1.0
