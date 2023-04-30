@@ -22,6 +22,7 @@ class AvitoParse:
                  keysword_list: list,
                  count: int = 10,
                  tg_token=None,
+                 max_price=0
                  ):
         self.url = url
         self.keys_word = keysword_list
@@ -29,6 +30,7 @@ class AvitoParse:
         self.data = []
         self.tg_token = tg_token
         self.title_file = self.__get_file_title()
+        self.max_price = int(max_price)
 
     def __set_up(self):
 
@@ -65,8 +67,13 @@ class AvitoParse:
         logger.info('Страница успешно загружена. Просматриваю объявления')
         while self.count > 0:
             self.__parse_page()
-            self.driver.find_element(*LocatorAvito.NEXT_BTN).click()
-            self.count -= 1
+            """Проверяем есть ли кнопка далее"""
+            if self.driver.find_elements(*LocatorAvito.NEXT_BTN):
+                self.driver.find_element(*LocatorAvito.NEXT_BTN).click()
+                self.count -= 1
+            else:
+                logger.info("Нет кнопки дальше")
+                break
 
     @logger.catch
     def __parse_page(self):
@@ -97,11 +104,11 @@ class AvitoParse:
             """Определяем нужно ли нам учитывать ключевые слова"""
             if self.keys_word != ['']:
                 if any([item.lower() in description.lower() for item in self.keys_word]) and int(
-                        price) == 0:
+                        price) <= self.max_price:
                     self.data.append(data)
                     """Отправляем в телеграм"""
                     logger.success(f"{data['url']} {data['description']}")
-            elif int(price) == 0:
+            elif int(price) <= self.max_price:
                 self.data.append(data)
                 """Отправляем в телеграм"""
                 logger.success(f"{data['url']} {data['description']}")
@@ -140,5 +147,9 @@ class AvitoParse:
         """Метод для вызова"""
         self.__set_up()
         self.__get_url()
-        self.__paginator()
-        self.driver.quit()
+        try:
+            self.__paginator()
+        except Exception as error:
+            logger.error(f"Ошибка: {error}")
+        finally:
+            self.driver.quit()

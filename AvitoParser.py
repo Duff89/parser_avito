@@ -4,8 +4,7 @@
 AvitoParser - Поиск бесплатных вещей на avito.ru
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.0
-
+__version__ = 1.01
 
 import os
 import threading, tkinter, time
@@ -70,6 +69,12 @@ class Window(tkinter.Tk):
         self.url_entry.grid(row=5, column=1, pady=5, sticky='w')
         self.url_entry.insert(0, self.start_url_env)
 
+        self.max_price_label = tkinter.Label(self, text="Максимальная цена:")
+        self.max_price_label.grid(row=6, column=0, pady=5, sticky='e')
+        self.max_price_entry = tkinter.Entry(self, width=self.width_entry_field)
+        self.max_price_entry.grid(row=6, column=1, pady=5, sticky='w')
+        self.max_price_entry.insert(0, str(self.max_price_env))
+
         self.test_button = tkinter.Button(self, text="ТЕСТ", padx=50, command=self.telegram_log_test)
         self.test_button.grid(row=1, column=2, padx=0, pady=0)
 
@@ -87,6 +92,8 @@ class Window(tkinter.Tk):
         ToolTip(self.freq_entry, "Пауза между повторами. В минутах").bind()
         ToolTip(self.url_entry, "Адрес с которого нужно начинать").bind()
         ToolTip(self.key_entry, "Ключевые слова. Вводить через запятую, регистр не важен").bind()
+        ToolTip(self.max_price_entry,
+                "Будет искать только объявления, где цена меньше либо равна введенному значению").bind()
 
     def telegram_log_test(self):
         """Тестирование отправки сообщения в telegram"""
@@ -118,7 +125,7 @@ class Window(tkinter.Tk):
 
         """Размещаем кнопку Стоп"""
         self.stop_button = tkinter.Button(self, text="Стоп", padx=50, command=self.stop_scraping)
-        self.stop_button.grid(row=6, column=0, columnspan=2, padx=5, pady=5)
+        self.stop_button.grid(row=7, column=0, columnspan=2, padx=5, pady=5)
 
         """Сохраняем конфиг"""
         self.save_config()
@@ -140,13 +147,13 @@ class Window(tkinter.Tk):
         self.update()
 
     def start_btn(self):
-        """Кнопка старт. Остановка работы"""
+        """Кнопка старт. Старт работы"""
         self.start_button = tkinter.Button(self,
                                            padx=50,
                                            text="Старт",
                                            command=lambda: self.is_run or
-                                                threading.Thread(target=self.start_scraping).start())
-        self.start_button.grid(row=6, column=0, columnspan=2, padx=5, pady=5)
+                                                           threading.Thread(target=self.start_scraping).start())
+        self.start_button.grid(row=7, column=0, columnspan=2, padx=5, pady=5)
 
     def stop_scraping(self):
         """Кнопка стоп. Остановка работы"""
@@ -166,15 +173,17 @@ class Window(tkinter.Tk):
         self.num_ads_env = self.config["Avito"]["NUM_ADS"]
         self.freq_env = self.config["Avito"]["FREQ"]
         self.keys_env = self.config["Avito"]["KEYS"]
+        self.max_price_env = self.config["Avito"].get("MAX_PRICE", "0")
 
     def save_config(self):
         """Сохраняет конфиг"""
         self.config["Avito"]["TG_TOKEN"] = self.token_entry.get()
         self.config["Avito"]["CHAT_ID"] = self.chat_id_entry.get()
-        self.config["Avito"]["URL"] = str(self.url_entry.get()).replace('%', '%%') # bugfix
+        self.config["Avito"]["URL"] = str(self.url_entry.get()).replace('%', '%%')  # bugfix
         self.config["Avito"]["NUM_ADS"] = self.ads_entry.get()
         self.config["Avito"]["FREQ"] = self.freq_entry.get()
         self.config["Avito"]["KEYS"] = self.key_entry.get()
+        self.config["Avito"]["MAX_PRICE"] = self.max_price_entry.get()
         with open('settings.ini', 'w') as configfile:
             self.config.write(configfile)
 
@@ -216,11 +225,13 @@ class Window(tkinter.Tk):
         num_ads = self.ads_entry.get() or 5
         keys = self.key_entry.get()
         self.frequency = self.freq_entry.get() or 5
+        max_price = self.max_price_entry.get()
 
         AvitoParse(
             url=url,
             count=int(num_ads),
             keysword_list=keys.split(","),
+            max_price=max_price
         ).parse()
 
 
