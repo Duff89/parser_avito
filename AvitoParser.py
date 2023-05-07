@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 """
-AvitoParser - Поиск бесплатных вещей на avito.ru
+AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.01
+__version__ = 1.02
 
 import os
 import threading, tkinter, time
@@ -69,10 +69,16 @@ class Window(tkinter.Tk):
         self.url_entry.grid(row=5, column=1, pady=5, sticky='w')
         self.url_entry.insert(0, self.start_url_env)
 
+        self.min_price_label = tkinter.Label(self, text="Минимальная цена:")
+        self.min_price_label.grid(row=6, column=0, pady=5, sticky='e')
+        self.min_price_entry = tkinter.Entry(self, width=self.width_entry_field)
+        self.min_price_entry.grid(row=6, column=1, pady=5, sticky='w')
+        self.min_price_entry.insert(0, str(self.min_price_env))
+
         self.max_price_label = tkinter.Label(self, text="Максимальная цена:")
-        self.max_price_label.grid(row=6, column=0, pady=5, sticky='e')
+        self.max_price_label.grid(row=7, column=0, pady=5, sticky='e')
         self.max_price_entry = tkinter.Entry(self, width=self.width_entry_field)
-        self.max_price_entry.grid(row=6, column=1, pady=5, sticky='w')
+        self.max_price_entry.grid(row=7, column=1, pady=5, sticky='w')
         self.max_price_entry.insert(0, str(self.max_price_env))
 
         self.test_button = tkinter.Button(self, text="ТЕСТ", padx=50, command=self.telegram_log_test)
@@ -92,6 +98,9 @@ class Window(tkinter.Tk):
         ToolTip(self.freq_entry, "Пауза между повторами. В минутах").bind()
         ToolTip(self.url_entry, "Адрес с которого нужно начинать").bind()
         ToolTip(self.key_entry, "Ключевые слова. Вводить через запятую, регистр не важен").bind()
+        ToolTip(self.min_price_entry,
+                "Будет искать только объявления, где цена больше либо равна введенному значению. "
+                "Оставьте 0 если Вам не нужен этот параметр").bind()
         ToolTip(self.max_price_entry,
                 "Будет искать только объявления, где цена меньше либо равна введенному значению").bind()
 
@@ -125,7 +134,7 @@ class Window(tkinter.Tk):
 
         """Размещаем кнопку Стоп"""
         self.stop_button = tkinter.Button(self, text="Стоп", padx=50, command=self.stop_scraping)
-        self.stop_button.grid(row=7, column=0, columnspan=2, padx=5, pady=5)
+        self.stop_button.grid(row=8, column=0, columnspan=2, padx=5, pady=5)
 
         """Сохраняем конфиг"""
         self.save_config()
@@ -153,7 +162,7 @@ class Window(tkinter.Tk):
                                            text="Старт",
                                            command=lambda: self.is_run or
                                                            threading.Thread(target=self.start_scraping).start())
-        self.start_button.grid(row=7, column=0, columnspan=2, padx=5, pady=5)
+        self.start_button.grid(row=8, column=0, columnspan=2, padx=5, pady=5)
 
     def stop_scraping(self):
         """Кнопка стоп. Остановка работы"""
@@ -174,6 +183,7 @@ class Window(tkinter.Tk):
         self.freq_env = self.config["Avito"]["FREQ"]
         self.keys_env = self.config["Avito"]["KEYS"]
         self.max_price_env = self.config["Avito"].get("MAX_PRICE", "0")
+        self.min_price_env = self.config["Avito"].get("MIN_PRICE", "0")
 
     def save_config(self):
         """Сохраняет конфиг"""
@@ -184,6 +194,7 @@ class Window(tkinter.Tk):
         self.config["Avito"]["FREQ"] = self.freq_entry.get()
         self.config["Avito"]["KEYS"] = self.key_entry.get()
         self.config["Avito"]["MAX_PRICE"] = self.max_price_entry.get()
+        self.config["Avito"]["MIN_PRICE"] = self.min_price_entry.get()
         with open('settings.ini', 'w') as configfile:
             self.config.write(configfile)
 
@@ -206,7 +217,7 @@ class Window(tkinter.Tk):
     def logger_widget_init(self):
         """Инициализация логирования в widget"""
         self.log_widget = tkinter.Text(self, wrap="word")
-        self.log_widget.grid(row=8, column=1)
+        self.log_widget.grid(row=9, column=1)
         self.log_widget.config(width=80, height=35)
         logger.add(self.logger_text_widget, format="{time:HH:mm:ss} - {message}")
         logger.info("Запуск AvitoParser")
@@ -226,12 +237,14 @@ class Window(tkinter.Tk):
         keys = self.key_entry.get()
         self.frequency = self.freq_entry.get() or 5
         max_price = self.max_price_entry.get()
+        min_price = self.min_price_entry.get()
 
         AvitoParse(
             url=url,
             count=int(num_ads),
             keysword_list=keys.split(","),
-            max_price=max_price
+            max_price=int(max_price),
+            min_price=int(min_price),
         ).parse()
 
 

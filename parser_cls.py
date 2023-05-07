@@ -1,8 +1,11 @@
 import json
 import os
 import subprocess
+import time
 
 import undetected_chromedriver as uc
+from notifiers.logging import NotificationHandler
+
 from selenium.webdriver.chrome.options import Options
 from loguru import logger
 from locator import LocatorAvito
@@ -21,8 +24,9 @@ class AvitoParse:
                  url: str,
                  keysword_list: list,
                  count: int = 10,
-                 tg_token=None,
-                 max_price=0
+                 tg_token: str = None,
+                 max_price: int = 0,
+                 min_price: int = 0
                  ):
         self.url = url
         self.keys_word = keysword_list
@@ -31,6 +35,7 @@ class AvitoParse:
         self.tg_token = tg_token
         self.title_file = self.__get_file_title()
         self.max_price = int(max_price)
+        self.min_price = int(min_price)
 
     def __set_up(self):
 
@@ -79,11 +84,15 @@ class AvitoParse:
     def __parse_page(self):
         """Парсит открытую страницу"""
 
-        with open('viewed.txt', 'r') as file:
-            self.viewed_list = list(map(str.rstrip, file.readlines()))
-            """Ограничение количества просмотренных объявлений"""
-            if len(self.viewed_list) > 2000:
-                self.viewed_list = self.viewed_list[-900:]
+        """Ограничение количества просмотренных объявлений"""
+        if os.path.isfile('viewed.txt'):
+            with open('viewed.txt', 'r') as file:
+                self.viewed_list = list(map(str.rstrip, file.readlines()))
+                if len(self.viewed_list) > 2000:
+                    self.viewed_list = self.viewed_list[-900:]
+        else:
+            with open('viewed.txt', 'w') as file:
+                self.viewed_list = []
 
         titles = self.driver.find_elements(*LocatorAvito.TITLES)
         for title in titles:
@@ -103,12 +112,12 @@ class AvitoParse:
             }
             """Определяем нужно ли нам учитывать ключевые слова"""
             if self.keys_word != ['']:
-                if any([item.lower() in description.lower() for item in self.keys_word]) and int(
+                if any([item.lower() in description.lower() for item in self.keys_word]) and self.min_price <= int(
                         price) <= self.max_price:
                     self.data.append(data)
                     """Отправляем в телеграм"""
                     logger.success(f"{data['url']} {data['description']}")
-            elif int(price) <= self.max_price:
+            elif self.min_price <= int(price) <= self.max_price:
                 self.data.append(data)
                 """Отправляем в телеграм"""
                 logger.success(f"{data['url']} {data['description']}")
@@ -145,11 +154,69 @@ class AvitoParse:
 
     def parse(self):
         """Метод для вызова"""
-        self.__set_up()
-        self.__get_url()
         try:
+            self.__set_up()
+            self.__get_url()
             self.__paginator()
         except Exception as error:
             logger.error(f"Ошибка: {error}")
+            time.sleep(30)  # если сбой в работе uc
         finally:
             self.driver.quit()
+
+
+def set_up(self):
+    """Работа с настройками"""
+
+
+
+if __name__ == '__main__':
+    """Здесь заменить данные на свои"""
+    import configparser
+
+    config = configparser.ConfigParser()  # создаём объекта парсера
+    config.read("settings.ini")  # читаем конфиг
+    url = config["Avito"]["URL"]
+    chat_id = config["Avito"]["CHAT_ID"]
+    token = config["Avito"]["TG_TOKEN"]
+    num_ads = config["Avito"]["NUM_ADS"]
+    freq = config["Avito"]["FREQ"]
+    keys = config["Avito"]["KEYS"]
+    max_price = config["Avito"].get("MAX_PRICE", "0")
+    min_price = config["Avito"].get("MIN_PRICE", "0")
+    # url = 'https://www.avito.ru/moskva/remont_i_stroitelstvo/sadovaya_tehnika-ASgBAgICAURYnAI'
+    # num_ads = 2  # 'количество страниц для поиска'
+    # keys = ''#'сумк, очки'  # ключевые слова
+    # min_price = 50  # минимальная цена
+    # max_price = 5000  # максимальная цена
+    # token = ''  # токен телеги
+    # chat_id = ''  # chat id телеги
+    # pause_time = 2  # пауза в минутах
+    """"""
+
+    if token and chat_id:
+        params = {
+            'token': token,
+            'chat_id': chat_id
+        }
+        tg_handler = NotificationHandler("telegram", defaults=params)
+
+        """Все логи уровня SUCCESS и выше отсылаются в телегу"""
+        logger.add(tg_handler, level="SUCCESS", format="{message}")
+
+
+    while True:
+        try:
+            AvitoParse(
+                url=url,
+                count=int(num_ads),
+                keysword_list=keys.split(","),
+                max_price=int(max_price),
+                min_price=int(min_price)
+            ).parse()
+            logger.info("Пауза")
+            time.sleep(int(freq) * 60)
+        except Exception as error:
+            logger.error('Ошибка, но работа будет продолжена через 30 сек')
+            logger.error(error)
+            time.sleep(30)
