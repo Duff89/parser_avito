@@ -7,3 +7,9 @@ class LocatorAvito:
     DESCRIPTIONS = (By.CSS_SELECTOR, "[class*='item-description']")
     URL = (By.CSS_SELECTOR, "[data-marker='item-title']")
     PRICE = (By.CSS_SELECTOR, "[itemprop='price']")
+    TOTAL_VIEWS = (By.CSS_SELECTOR, "[data-marker='item-view/total-views']")
+    DATE_PUBLIC = (By.CSS_SELECTOR, "[data-marker='item-view/item-date']")
+    SELLER_NAME = (By.CSS_SELECTOR, "[data-marker='seller-info/label']")
+    COMPANY_NAME = (By.CSS_SELECTOR, "[data-marker='seller-link/link']")
+    COMPANY_NAME_TEXT = (By.CSS_SELECTOR, "span")
+

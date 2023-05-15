@@ -4,7 +4,7 @@
 AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.02
+__version__ = 1.05
 
 import os
 import threading, tkinter, time
@@ -21,13 +21,12 @@ from tooltip import ToolTip
 class Window(tkinter.Tk):
     def __init__(self):
         tkinter.Tk.__init__(self)
-        self.geometry("1000x900")
+        self.geometry("1000x1000")
         self.width_entry_field = 80
         self.resizable(width=False, height=False)
         self.title(f"AvitoParser v.{__version__}")
         self.is_run = False
         self.main_windows_init()
-        self.logger_tg()
         self.logger_widget_init()
 
     def main_windows_init(self):
@@ -81,13 +80,18 @@ class Window(tkinter.Tk):
         self.max_price_entry.grid(row=7, column=1, pady=5, sticky='w')
         self.max_price_entry.insert(0, str(self.max_price_env))
 
-        self.test_button = tkinter.Button(self, text="ТЕСТ", padx=50, command=self.telegram_log_test)
+        self.test_button = tkinter.Button(self, text="Тест", padx=50, command=self.telegram_log_test)
         self.test_button.grid(row=1, column=2, padx=0, pady=0)
 
         link_label = tkinter.Label(self, text="Связаться с автором или сообщить о проблеме",
                                    fg="blue", cursor="hand2")
         link_label.grid(column=1, row=200, pady=10)
         link_label.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/Duff89/parser_avito"))
+
+        link_label = tkinter.Label(self, text="Поддержать развитие проекта",
+                                   fg="blue", cursor="hand2")
+        link_label.grid(column=1, row=202, pady=10)
+        link_label.bind("<Button-1>", lambda e: webbrowser.open_new("https://yoomoney.ru/to/410014382689862"))
 
         # кнопка "Старт"
         self.start_btn()
@@ -104,8 +108,10 @@ class Window(tkinter.Tk):
         ToolTip(self.max_price_entry,
                 "Будет искать только объявления, где цена меньше либо равна введенному значению").bind()
 
+
     def telegram_log_test(self):
         """Тестирование отправки сообщения в telegram"""
+        self.logger_tg()
         token = self.token_entry.get()
         chat_id = self.chat_id_entry.get()
         if all([token, chat_id]):
@@ -201,6 +207,7 @@ class Window(tkinter.Tk):
     def logger_tg(self):
         """Логирование в telegram"""
         token = self.token_entry.get()
+        print(token)
         chat_id = self.chat_id_entry.get()
         if token and chat_id:
             params = {
@@ -217,8 +224,8 @@ class Window(tkinter.Tk):
     def logger_widget_init(self):
         """Инициализация логирования в widget"""
         self.log_widget = tkinter.Text(self, wrap="word")
-        self.log_widget.grid(row=9, column=1)
-        self.log_widget.config(width=80, height=35)
+        self.log_widget.grid(row=9, column=0, columnspan=3, padx=5)
+        self.log_widget.config(width=123, height=35)
         logger.add(self.logger_text_widget, format="{time:HH:mm:ss} - {message}")
         logger.info("Запуск AvitoParser")
         logger.info("Чтобы начать работу, проверьте, чтобы поле URL было заполненными, "
