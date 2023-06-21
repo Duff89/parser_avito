@@ -1,20 +1,15 @@
 import os
-import subprocess
 import time
 import csv
-from random import choice
-
-import undetected_chromedriver as uc
 from notifiers.logging import NotificationHandler
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.window import WindowTypes
+from seleniumbase import SB
 from loguru import logger
 from locator import LocatorAvito
 
 
 class AvitoParse:
     """
-    Парсинг бесплатных товаров на avito.ru
+    Парсинг  товаров на avito.ru
     url - начальный url
     keysword_list- список ключевых слов
     count - сколько проверять страниц
@@ -27,7 +22,8 @@ class AvitoParse:
                  count: int = 10,
                  tg_token: str = None,
                  max_price: int = 0,
-                 min_price: int = 0
+                 min_price: int = 0,
+
                  ):
         self.url = url
         self.keys_word = keysword_list
@@ -38,38 +34,12 @@ class AvitoParse:
         self.max_price = int(max_price)
         self.min_price = int(min_price)
 
-    def __set_up(self):
-        options = Options()
-        options.add_argument('--headless')
-        _ua = choice(list(map(str.rstrip, open("user_agent_pc.txt").readlines())))
-        options.add_argument(f'--user-agent={_ua}')
-        self.driver = uc.Chrome(version_main=self.__get_chrome_version,
-                                options=options,
-                                )
 
-    @property
-    def __get_chrome_version(self):
-        """Определяет версию chrome в зависимости от платформы"""
-        if os.name == 'nt':
-            import winreg
-            # открываем ключ реестра, содержащий информацию о Google Chrome
-            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
-            # считываем значение ключа "version"
-            version = winreg.QueryValueEx(reg_key, "version")[0]
-            return version.split(".")[0]
-        else:
-            output = subprocess.check_output(['google-chrome', '--version'])
-            try:
-                version = output.decode('utf-8').split()[-1]
-                version = version.split(".")[0]
-                return version
-            except Exception as error:
-                logger.error(error)
-                logger.info("У Вас не установлен Chrome, либо он требует обновления")
-                raise Exception("Chrome Exception")
 
     def __get_url(self):
-        self.driver.get(self.url)
+        self.driver.open(self.url)
+        self.driver.open_new_window() # сразу открываем и вторую вкладку
+        self.driver.switch_to_window(window=0)
 
     def __paginator(self):
         """Кнопка далее"""
@@ -78,9 +48,10 @@ class AvitoParse:
         while self.count > 0:
             self.__parse_page()
             """Проверяем есть ли кнопка далее"""
-            if self.driver.find_elements(*LocatorAvito.NEXT_BTN):
-                self.driver.find_element(*LocatorAvito.NEXT_BTN).click()
+            if self.driver.find_elements(LocatorAvito.NEXT_BTN[1], by="css selector"):
+                self.driver.find_element(LocatorAvito.NEXT_BTN[1], by="css selector").click()
                 self.count -= 1
+                logger.debug("Следующая страница")
             else:
                 logger.info("Нет кнопки дальше")
                 break
@@ -99,10 +70,17 @@ class AvitoParse:
             with open('viewed.txt', 'w') as file:
                 self.viewed_list = []
 
-        titles = self.driver.find_elements(*LocatorAvito.TITLES)
+        titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        self.driver.save_screenshot("1.png")
         for title in titles:
+            self.driver.save_screenshot("1.png")
             name = title.find_element(*LocatorAvito.NAME).text
-            description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+
+            if title.find_elements(*LocatorAvito.DESCRIPTIONS):
+                description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+            else:
+                description = ''
+
             url = title.find_element(*LocatorAvito.URL).get_attribute("href")
             price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
@@ -118,7 +96,9 @@ class AvitoParse:
             }
             """Определяем нужно ли нам учитывать ключевые слова"""
             if self.keys_word != ['']:
-                if any([item.lower() in description.lower() for item in self.keys_word]) and self.min_price <= int(
+                if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]) \
+                        and \
+                        self.min_price <= int(
                         price) <= self.max_price:
                     self.data.append(self.__parse_full_page(url, data))
                     """Отправляем в телеграм"""
@@ -146,33 +126,39 @@ class AvitoParse:
 
     def __parse_full_page(self, url: str, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление на отдельной вкладке"""
-        self.driver.switch_to.new_window(WindowTypes.TAB)  # новая вкладка
+        self.driver.switch_to_window(window=1)
         self.driver.get(url)
-        self.driver.switch_to.window(self.driver.window_handles[1])
+
+        """Если не дождались загрузки"""
+        try:
+            self.driver.wait_for_element(LocatorAvito.TOTAL_VIEWS[1], by="css selector", timeout=10)
+        except Exception:
+            """Проверка на бан по ip"""
+            if "Доступ ограничен" in self.driver.get_title():
+                logger.success("Доступ ограничен: проблема с IP. \nПоследние объявления будут без подробностей")
+
+            self.driver.switch_to_window(window=0)
+            return data
 
         """Количество просмотров"""
-        if self.driver.find_elements(*LocatorAvito.TOTAL_VIEWS):
-            total_views = self.driver.find_element(*LocatorAvito.TOTAL_VIEWS).text.split()[0]
+        if self.driver.find_elements(LocatorAvito.TOTAL_VIEWS[1], by="css selector" ):
+            total_views = self.driver.find_element(LocatorAvito.TOTAL_VIEWS[1]).text.split()[0]
             data["views"] = total_views
 
         """Дата публикации"""
-        if self.driver.find_elements(*LocatorAvito.DATE_PUBLIC):
-            date_public = self.driver.find_element(*LocatorAvito.DATE_PUBLIC).text
+        if self.driver.find_elements(LocatorAvito.DATE_PUBLIC[1], by="css selector"):
+            date_public = self.driver.find_element(LocatorAvito.DATE_PUBLIC[1], by="css selector").text
             if "· " in date_public:
                 date_public = date_public.replace("· ", '')
             data["date_public"] = date_public
 
         """Имя продавца"""
-        if self.driver.find_elements(*LocatorAvito.SELLER_NAME):
-            seller_name = self.driver.find_element(*LocatorAvito.SELLER_NAME).text
-            if seller_name == 'Компания' and self.driver.find_elements(*LocatorAvito.COMPANY_NAME):
-                seller_name = self.driver.find_element(*LocatorAvito.COMPANY_NAME) \
-                    .find_element(*LocatorAvito.COMPANY_NAME_TEXT).text
+        if self.driver.find_elements(LocatorAvito.SELLER_NAME[1], by="css selector"):
+            seller_name = self.driver.find_element(LocatorAvito.SELLER_NAME[1], by="css selector").text
             data["seller_name"] = seller_name
 
-        """Закрывает вкладку №2 и возвращается на №1"""
-        self.driver.close()
-        self.driver.switch_to.window(self.driver.window_handles[0])
+        """Возвращается на вкладку №1"""
+        self.driver.switch_to_window(window=0)
         return data
 
     def is_viewed(self, ads_id: str) -> bool:
@@ -184,7 +170,7 @@ class AvitoParse:
     def __save_data(self, data: dict):
         """Сохраняет результат в файл keyword*.csv"""
 
-        with open(f"result/{self.title_file}.csv", mode="a", newline='') as file:
+        with open(f"result/{self.title_file}.csv", mode="a", newline='', encoding='utf-8', errors='ignore') as file:
             writer = csv.writer(file)
             writer.writerow([
                 data.get("name", '-'),
@@ -193,7 +179,7 @@ class AvitoParse:
                 data.get("description", '-'),
                 data.get("views", '-'),
                 data.get("date_public", '-'),
-                data.get("seller_name", '-'),
+                data.get("seller_name", 'no'),
             ])
 
         """сохраняет просмотренные объявления"""
@@ -206,9 +192,8 @@ class AvitoParse:
         """Пустой csv или нет"""
         os.makedirs(os.path.dirname("result/"), exist_ok=True)
         try:
-            with open(f"result/{self.title_file}.csv", 'r') as file:
+            with open(f"result/{self.title_file}.csv", 'r', encoding='utf-8', errors='ignore') as file:
                 reader = csv.reader(file)
-                writer = csv.writer(file)
                 try:
                     # Попытка чтения первой строки
                     first_row = next(reader)
@@ -219,11 +204,12 @@ class AvitoParse:
         except FileNotFoundError:
             return True
 
+    @logger.catch
     def __create_file_csv(self):
         """Создает файл и прописывает названия если нужно"""
 
         if self.__is_csv_empty:
-            with open(f"result/{self.title_file}.csv", 'a') as file:
+            with open(f"result/{self.title_file}.csv", 'a', encoding='utf-8', errors='ignore') as file:
                 writer = csv.writer(file)
                 writer.writerow([
                     "Название",
@@ -244,16 +230,21 @@ class AvitoParse:
             title_file = 'all'
         return title_file
 
+
     def parse(self):
         """Метод для вызова"""
-        try:
-            self.__set_up()
-            self.__get_url()
-            self.__paginator()
-        except Exception as error:
-            logger.error(f"Ошибка: {error}")
-        finally:
-            self.driver.quit()
+        with SB(uc=True,
+                headless=True,
+                page_load_strategy="eager",
+                block_images=True,
+                skip_js_waits=True,
+                ) as self.driver:
+            try:
+                self.__get_url()
+                self.__paginator()
+            except Exception as error:
+                logger.error(f"Ошибка: {error}")
+
 
 
 if __name__ == '__main__':
@@ -296,5 +287,5 @@ if __name__ == '__main__':
             logger.error(error)
             logger.error('Произошла ошибка, но работа будет продолжена через 30 сек. '
                          'Если ошибка повторится несколько раз - перезапустите скрипт.'
-                         'Если и это не поможет - обратитесь к разработчику')
+                         'Если и это не поможет - обратитесь к разработчику по ссылке ниже')
             time.sleep(30)
