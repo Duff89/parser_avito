@@ -4,9 +4,8 @@
 AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.05
+__version__ = 1.06
 
-import os
 import threading, tkinter, time
 import webbrowser
 import configparser
@@ -21,13 +20,13 @@ from tooltip import ToolTip
 class Window(tkinter.Tk):
     def __init__(self):
         tkinter.Tk.__init__(self)
-        self.geometry("1000x1000")
         self.width_entry_field = 80
-        self.resizable(width=False, height=False)
+        self.resizable(width=True, height=True)
         self.title(f"AvitoParser v.{__version__}")
         self.is_run = False
         self.main_windows_init()
         self.logger_widget_init()
+        self.tg_logger_init = False
 
     def main_windows_init(self):
         """Инициализация всех полей"""
@@ -90,8 +89,9 @@ class Window(tkinter.Tk):
 
         link_label = tkinter.Label(self, text="Поддержать развитие проекта",
                                    fg="blue", cursor="hand2")
-        link_label.grid(column=1, row=202, pady=10)
+        link_label.grid(column=1, row=201, pady=10)
         link_label.bind("<Button-1>", lambda e: webbrowser.open_new("https://yoomoney.ru/to/410014382689862"))
+
 
         # кнопка "Старт"
         self.start_btn()
@@ -111,11 +111,13 @@ class Window(tkinter.Tk):
 
     def telegram_log_test(self):
         """Тестирование отправки сообщения в telegram"""
+        #if not self.tg_logger_init:
         self.logger_tg()
         token = self.token_entry.get()
         chat_id = self.chat_id_entry.get()
         if all([token, chat_id]):
             logger.success('test')
+
             logger.info('Если сообщение пришло к Вам в telegram - значит всё настроено правильно. Если нет - '
                         'результат парсинга всегда можно посмотреть в папке result или ниже')
             return None
@@ -123,13 +125,13 @@ class Window(tkinter.Tk):
 
     def start_scraping(self):
         """Кнопка старт. Запуск"""
+        self.logger_tg()
 
         """Если URL все-таки не заполнен"""
         url = self.url_entry.get()
         if not url:
             logger.info("Внимание! URL - обязательный параметр. Пример ссылки:")
-            logger.info("https://www.avito.ru/all/lichnye_veschi?cd=1&"
-                        "q=%D0%B1%D0%B5%D1%81%D0%BF%D0%BB%D0%B0%D1%82%D0%BD%D0%BE")
+            logger.info("https://www.avito.ru/moskva/remont_i_stroitelstvo/sadovaya_tehnika-ASgBAgICAURYnAI")
             return
         """Прячем кнопку старт"""
         self.is_run = True
@@ -207,8 +209,8 @@ class Window(tkinter.Tk):
     def logger_tg(self):
         """Логирование в telegram"""
         token = self.token_entry.get()
-        print(token)
         chat_id = self.chat_id_entry.get()
+        if self.tg_logger_init: return
         if token and chat_id:
             params = {
                 'token': token,
@@ -218,6 +220,7 @@ class Window(tkinter.Tk):
 
             """Все логи уровня SUCCESS и выше отсылаются в телегу"""
             logger.add(tg_handler, level="SUCCESS", format="{message}")
+            self.tg_logger_init = True
             return None
         logger.info("Данные для отправки в telegram не заполнены. Результат будет сохранен в файл и выведен здесь")
 
