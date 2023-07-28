@@ -259,8 +259,8 @@ if __name__ == '__main__':
     num_ads = config["Avito"]["NUM_ADS"]
     freq = config["Avito"]["FREQ"]
     keys = config["Avito"]["KEYS"]
-    max_price = config["Avito"].get("MAX_PRICE", "0")
-    min_price = config["Avito"].get("MIN_PRICE", "0")
+    max_price = config["Avito"].get("MAX_PRICE", "0") or "0"
+    min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
 
     if token and chat_id:
         params = {

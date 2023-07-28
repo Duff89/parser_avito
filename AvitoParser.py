@@ -4,7 +4,7 @@
 AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.06
+__version__ = 1.07
 
 import customtkinter
 
@@ -238,8 +238,8 @@ class Window(customtkinter.CTk):
         num_ads = self.ads_entry.get() or 5
         keys = self.key_entry.get()
         self.frequency = self.freq_entry.get() or 5
-        max_price = self.max_price_entry.get()
-        min_price = self.min_price_entry.get()
+        max_price = self.max_price_entry.get() or 1000000
+        min_price = self.min_price_entry.get() or 0
 
         AvitoParse(
             url=url,
