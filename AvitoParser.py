@@ -4,7 +4,7 @@
 AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
 by Duff89 (https://github.com/Duff89)
 """
-__version__ = 1.07
+__version__ = 1.08
 
 import customtkinter
 
