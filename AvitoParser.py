@@ -62,7 +62,7 @@ class Window(customtkinter.CTk):
 
         self.key_label = customtkinter.CTkLabel(self, text="Ключевые слова:")
         self.key_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.key_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Через запятую(регистр не важен)")
+        self.key_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Через запятую (регистр не важен)")
         self.key_entry.grid(row=2, column=1, padx=10, pady=5, sticky='ew')
         self.key_entry.insert(0, self.keys_env)
 
@@ -97,7 +97,7 @@ class Window(customtkinter.CTk):
         self.max_price_entry.insert(0, str(self.max_price_env))
 
         self.test_button = customtkinter.CTkButton(self, text="Получить тестовое уведомление", command=self.telegram_log_test)
-        self.test_button.grid(row=9, column=1,  pady=5, padx=10, sticky="w")
+        self.test_button.grid(row=9, column=1,  pady=(10, 0), padx=10, sticky="w")
 
         # кнопка "Старт"
         self.start_btn()
@@ -135,7 +135,7 @@ class Window(customtkinter.CTk):
 
         """Размещаем кнопку Стоп"""
         self.stop_button = customtkinter.CTkButton(self, text="Стоп", command=self.stop_scraping)
-        self.stop_button.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
+        self.stop_button.grid(row=9, column=0, padx=10, pady=(10, 0), sticky="ew")
 
         """Сохраняем конфиг"""
         self.save_config()
@@ -162,13 +162,13 @@ class Window(customtkinter.CTk):
                                            text="Старт",
                                            command=lambda: self.is_run or
                                                            threading.Thread(target=self.start_scraping).start())
-        self.start_button.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
+        self.start_button.grid(row=9, column=0, padx=10, pady=(10, 0), sticky="ew")
 
     def stop_scraping(self):
         """Кнопка стоп. Остановка работы"""
         logger.info("Идет остановка. Пожалуйста, подождите")
         self.is_run = False
-        self.stop_button.configure(text='Останавливаюсь', state='disabled', row=9, column=0, padx=10, pady=5, sticky="ew")
+        self.stop_button.configure(text='Останавливаюсь', state='disabled', row=9, column=0, padx=10, pady=(10, 0), sticky="ew")
         self.update()
 
     def set_up(self):
