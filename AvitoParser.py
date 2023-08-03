@@ -26,7 +26,9 @@ class Window(customtkinter.CTk):
         # Возможное решение №1
         self.after(0, lambda: self.state('zoomed'))
         self.update()
-        # Возможное решение №2 (+53px к width и +31px к height)
+        # №3 
+        self.grid_columnconfigure(1, weight=1)
+        # Возможное решение №2 (+53px к width b +31px к height)
         # if sys.platform.startswith('win'):
             # self.geometry("528x590")
         # else:
@@ -49,53 +51,53 @@ class Window(customtkinter.CTk):
         self.token_label = customtkinter.CTkLabel(self, text="Token:")
         self.token_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
         self.token_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Введите токен вашего Telegram бота")
-        self.token_entry.grid(row=0, column=1, pady=5, sticky='w')
+        self.token_entry.grid(row=0, column=1, padx=10, pady=5, sticky='ew')
         self.token_entry.insert(0, self.tg_token_env)
 
         self.chat_id_label = customtkinter.CTkLabel(self, text="Chat ID:")
         self.chat_id_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
         self.chat_id_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Введите ID чата вашего диалога в Telegram")
-        self.chat_id_entry.grid(row=1, column=1, pady=5, sticky='w')
+        self.chat_id_entry.grid(row=1, column=1, padx=10, pady=5, sticky='ew')
         self.chat_id_entry.insert(0, self.chat_id_env)
 
         self.key_label = customtkinter.CTkLabel(self, text="Ключевые слова:")
         self.key_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
         self.key_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Через запятую(регистр не важен)")
-        self.key_entry.grid(row=2, column=1, pady=5, sticky='w')
+        self.key_entry.grid(row=2, column=1, padx=10, pady=5, sticky='ew')
         self.key_entry.insert(0, self.keys_env)
 
         self.ads_label = customtkinter.CTkLabel(self, text="Количество страниц:")
         self.ads_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
         self.ads_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Сколько страниц проверять каждый раз")
-        self.ads_entry.grid(row=3, column=1, pady=5, sticky='w')
+        self.ads_entry.grid(row=3, column=1, padx=10, pady=5, sticky='ew')
         self.ads_entry.insert(0, self.num_ads_env)
 
         self.freq_label = customtkinter.CTkLabel(self, text="Пауза:")
         self.freq_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
         self.freq_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Пауза между повторами (в минутах)")
-        self.freq_entry.grid(row=4, column=1, pady=5, sticky='w')
+        self.freq_entry.grid(row=4, column=1, padx=10, pady=5, sticky='ew')
         self.freq_entry.insert(0, self.freq_env)
 
         self.url_label = customtkinter.CTkLabel(self, text="Url:")
         self.url_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
         self.url_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Адрес с которого нужно начинать")
-        self.url_entry.grid(row=5, column=1, pady=5, sticky='w')
+        self.url_entry.grid(row=5, column=1, padx=10, pady=5, sticky='ew')
         self.url_entry.insert(0, self.start_url_env)
 
         self.min_price_label = customtkinter.CTkLabel(self, text="Минимальная цена:")
         self.min_price_label.grid(row=6, column=0, padx=10, pady=5, sticky="w")
         self.min_price_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Цена больше либо равна введенному значению")
-        self.min_price_entry.grid(row=6, column=1, pady=5, sticky='w')
+        self.min_price_entry.grid(row=6, column=1, padx=10, pady=5, sticky='ew')
         self.min_price_entry.insert(0, str(self.min_price_env))
 
         self.max_price_label = customtkinter.CTkLabel(self, text="Максимальная цена:")
         self.max_price_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
         self.max_price_entry = customtkinter.CTkEntry(self, width=self.width_entry_field, placeholder_text="Цена меньше либо равна введенному значению")
-        self.max_price_entry.grid(row=7, column=1, pady=5, sticky='w')
+        self.max_price_entry.grid(row=7, column=1, padx=10, pady=5, sticky='ew')
         self.max_price_entry.insert(0, str(self.max_price_env))
 
         self.test_button = customtkinter.CTkButton(self, text="Получить тестовое уведомление", command=self.telegram_log_test)
-        self.test_button.grid(row=9, column=1, pady=5, padx=(0, 6), sticky="ew")
+        self.test_button.grid(row=9, column=1,  pady=5, padx=10, sticky="w")
 
         # кнопка "Старт"
         self.start_btn()
@@ -133,7 +135,7 @@ class Window(customtkinter.CTk):
 
         """Размещаем кнопку Стоп"""
         self.stop_button = customtkinter.CTkButton(self, text="Стоп", command=self.stop_scraping)
-        self.stop_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+        self.stop_button.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
 
         """Сохраняем конфиг"""
         self.save_config()
@@ -160,13 +162,13 @@ class Window(customtkinter.CTk):
                                            text="Старт",
                                            command=lambda: self.is_run or
                                                            threading.Thread(target=self.start_scraping).start())
-        self.start_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+        self.start_button.grid(row=9, column=0, padx=10, pady=5, sticky="ew")
 
     def stop_scraping(self):
         """Кнопка стоп. Остановка работы"""
         logger.info("Идет остановка. Пожалуйста, подождите")
         self.is_run = False
-        self.stop_button.configure(text='Останавливаюсь', state='disabled', row=9, column=0, padx=5, pady=5, sticky="ew")
+        self.stop_button.configure(text='Останавливаюсь', state='disabled', row=9, column=0, padx=10, pady=5, sticky="ew")
         self.update()
 
     def set_up(self):
@@ -216,8 +218,8 @@ class Window(customtkinter.CTk):
 
     def logger_widget_init(self):
         """Инициализация логирования в widget"""
-        self.log_widget = customtkinter.CTkTextbox(self, wrap="word", width=650, height=300, text_color="#00ff26")
-        self.log_widget.grid(row=10, padx=5, pady=(10, 0), column=0, columnspan=2)
+        self.log_widget = customtkinter.CTkTextbox(self, wrap="word", width=800, height=350, text_color="#00ff26")
+        self.log_widget.grid(row=10, padx=10, pady=(10, 0), column=0, columnspan=2)
         logger.add(self.logger_text_widget, format="{time:HH:mm:ss} - {message}")
         logger.info("Запуск AvitoParser")
         logger.info("Чтобы начать работу, проверьте, чтобы поле URL было заполненными, "
