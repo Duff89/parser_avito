@@ -26,7 +26,7 @@ class Window(customtkinter.CTk):
         # Возможное решение №1
         self.after(0, lambda: self.state('zoomed'))
         self.update()
-        # №3 
+        # №3
         self.grid_columnconfigure(1, weight=1)
         # Возможное решение №2 (+53px к width b +31px к height)
         # if sys.platform.startswith('win'):
@@ -219,7 +219,7 @@ class Window(customtkinter.CTk):
     def logger_widget_init(self):
         """Инициализация логирования в widget"""
         self.log_widget = customtkinter.CTkTextbox(self, wrap="word", width=800, height=350, text_color="#00ff26")
-        self.log_widget.grid(row=10, padx=10, pady=(10, 0), column=0, columnspan=2)
+        self.log_widget.grid(row=10, padx=10, pady=(10, 0), column=0, columnspan=2, sticky="ew")
         logger.add(self.logger_text_widget, format="{time:HH:mm:ss} - {message}")
         logger.info("Запуск AvitoParser")
         logger.info("Чтобы начать работу, проверьте, чтобы поле URL было заполненными, "
