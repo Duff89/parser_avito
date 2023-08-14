@@ -1,0 +1,6 @@
+result/
+latest_logs/
+downloaded_files/
+__pycache__/
+viewed.txt
+settings.ini
