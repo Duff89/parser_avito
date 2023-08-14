@@ -19,6 +19,7 @@ class AvitoParse:
     def __init__(self,
                  url: str,
                  keysword_list: list,
+                 antikeysword_list: list,
                  count: int = 10,
                  tg_token: str = None,
                  max_price: int = 0,
@@ -27,6 +28,7 @@ class AvitoParse:
                  ):
         self.url = url
         self.keys_word = keysword_list
+        self.antikeys_word = antikeysword_list
         self.count = count
         self.data = []
         self.tg_token = tg_token
@@ -34,11 +36,9 @@ class AvitoParse:
         self.max_price = int(max_price)
         self.min_price = int(min_price)
 
-
-
     def __get_url(self):
         self.driver.open(self.url)
-        self.driver.open_new_window() # сразу открываем и вторую вкладку
+        self.driver.open_new_window()  # сразу открываем и вторую вкладку
         self.driver.switch_to_window(window=0)
 
     def __paginator(self):
@@ -49,7 +49,8 @@ class AvitoParse:
             self.__parse_page()
             """Проверяем есть ли кнопка далее"""
             if self.driver.find_elements(LocatorAvito.NEXT_BTN[1], by="css selector"):
-                self.driver.find_element(LocatorAvito.NEXT_BTN[1], by="css selector").click()
+                self.driver.find_element(
+                    LocatorAvito.NEXT_BTN[1], by="css selector").click()
                 self.count -= 1
                 logger.debug("Следующая страница")
             else:
@@ -70,19 +71,22 @@ class AvitoParse:
             with open('viewed.txt', 'w') as file:
                 self.viewed_list = []
 
-        titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        titles = self.driver.find_elements(
+            LocatorAvito.TITLES[1], by="css selector")
         self.driver.save_screenshot("1.png")
         for title in titles:
             self.driver.save_screenshot("1.png")
             name = title.find_element(*LocatorAvito.NAME).text
 
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
-                description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+                description = title.find_element(
+                    *LocatorAvito.DESCRIPTIONS).text
             else:
                 description = ''
 
             url = title.find_element(*LocatorAvito.URL).get_attribute("href")
-            price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
+            price = title.find_element(
+                *LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
 
             if self.is_viewed(ads_id):
@@ -94,24 +98,21 @@ class AvitoParse:
                 'url': url,
                 'price': price
             }
-            """Определяем нужно ли нам учитывать ключевые слова"""
-            if self.keys_word != ['']:
-                if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]) \
-                        and \
-                        self.min_price <= int(
-                        price) <= self.max_price:
-                    self.data.append(self.__parse_full_page(url, data))
-                    """Отправляем в телеграм"""
-                    self.__pretty_log(data=data)
-                    self.__save_data(data=data)
-            elif self.min_price <= int(price) <= self.max_price:
+            """Определяем, проходит ли по ключевым словам или словам из черного списка"""
+            if (self.keys_word != [''] and not any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word])) \
+                or \
+               (self.antikeys_word != [''] and any([item.lower() in (description.lower() + name.lower()) for item in self.antikeys_word])):
 
-                self.data.append(self.__parse_full_page(url, data))
-                """Отправляем в телеграм"""
-                self.__pretty_log(data=data)
-                self.__save_data(data=data)
-            else:
                 continue
+
+            """Фильтр по цене"""
+            if not self.min_price <= int(price) <= self.max_price:
+                continue
+
+            self.data.append(self.__parse_full_page(url, data))
+            """Отправляем в телеграм"""
+            self.__pretty_log(data=data)
+            self.__save_data(data=data)
 
     def __pretty_log(self, data):
         """Красивый вывод"""
@@ -131,30 +132,35 @@ class AvitoParse:
 
         """Если не дождались загрузки"""
         try:
-            self.driver.wait_for_element(LocatorAvito.TOTAL_VIEWS[1], by="css selector", timeout=10)
+            self.driver.wait_for_element(
+                LocatorAvito.TOTAL_VIEWS[1], by="css selector", timeout=10)
         except Exception:
             """Проверка на бан по ip"""
             if "Доступ ограничен" in self.driver.get_title():
-                logger.success("Доступ ограничен: проблема с IP. \nПоследние объявления будут без подробностей")
+                logger.success(
+                    "Доступ ограничен: проблема с IP. \nПоследние объявления будут без подробностей")
 
             self.driver.switch_to_window(window=0)
             return data
 
         """Количество просмотров"""
-        if self.driver.find_elements(LocatorAvito.TOTAL_VIEWS[1], by="css selector" ):
-            total_views = self.driver.find_element(LocatorAvito.TOTAL_VIEWS[1]).text.split()[0]
+        if self.driver.find_elements(LocatorAvito.TOTAL_VIEWS[1], by="css selector"):
+            total_views = self.driver.find_element(
+                LocatorAvito.TOTAL_VIEWS[1]).text.split()[0]
             data["views"] = total_views
 
         """Дата публикации"""
         if self.driver.find_elements(LocatorAvito.DATE_PUBLIC[1], by="css selector"):
-            date_public = self.driver.find_element(LocatorAvito.DATE_PUBLIC[1], by="css selector").text
+            date_public = self.driver.find_element(
+                LocatorAvito.DATE_PUBLIC[1], by="css selector").text
             if "· " in date_public:
                 date_public = date_public.replace("· ", '')
             data["date_public"] = date_public
 
         """Имя продавца"""
         if self.driver.find_elements(LocatorAvito.SELLER_NAME[1], by="css selector"):
-            seller_name = self.driver.find_element(LocatorAvito.SELLER_NAME[1], by="css selector").text
+            seller_name = self.driver.find_element(
+                LocatorAvito.SELLER_NAME[1], by="css selector").text
             data["seller_name"] = seller_name
 
         """Возвращается на вкладку №1"""
@@ -230,21 +236,19 @@ class AvitoParse:
             title_file = 'all'
         return title_file
 
-
     def parse(self):
         """Метод для вызова"""
         with SB(uc=True,
                 headless=True,
                 page_load_strategy="eager",
                 block_images=True,
-                skip_js_waits=True,
+                skip_js_waits=True
                 ) as self.driver:
             try:
                 self.__get_url()
                 self.__paginator()
             except Exception as error:
                 logger.error(f"Ошибка: {error}")
-
 
 
 if __name__ == '__main__':
@@ -259,6 +263,7 @@ if __name__ == '__main__':
     num_ads = config["Avito"]["NUM_ADS"]
     freq = config["Avito"]["FREQ"]
     keys = config["Avito"]["KEYS"]
+    antikeys = config["Avito"]["ANTIKEYS"]
     max_price = config["Avito"].get("MAX_PRICE", "0") or "0"
     min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
 
@@ -278,6 +283,7 @@ if __name__ == '__main__':
                 url=url,
                 count=int(num_ads),
                 keysword_list=keys.split(","),
+                antikeysword_list=antikeys.split(","),
                 max_price=int(max_price),
                 min_price=int(min_price)
             ).parse()

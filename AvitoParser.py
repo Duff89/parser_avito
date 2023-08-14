@@ -111,6 +111,14 @@ class Window(customtkinter.CTk):
         self.max_price_entry.grid(row=7, column=1, pady=5, sticky='w')
         self.max_price_entry.insert(0, str(self.max_price_env))
 
+        self.antikey_label = customtkinter.CTkLabel(
+            self, text="Слова черного списка:")
+        self.antikey_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
+        self.antikey_entry = customtkinter.CTkEntry(
+            self, width=self.width_entry_field, placeholder_text="Через запятую(регистр не важен)")
+        self.antikey_entry.grid(row=8, column=1, pady=5, sticky='w')
+        self.antikey_entry.insert(0, self.antikeys_env)
+
         self.test_button = customtkinter.CTkButton(
             self, text="Получить тестовое уведомление", command=self.telegram_log_test)
         self.test_button.grid(row=9, column=1, pady=5,
@@ -206,6 +214,7 @@ class Window(customtkinter.CTk):
         self.num_ads_env = self.config["Avito"]["NUM_ADS"]
         self.freq_env = self.config["Avito"]["FREQ"]
         self.keys_env = self.config["Avito"]["KEYS"]
+        self.antikeys_env = self.config["Avito"]["ANTIKEYS"]
         self.max_price_env = self.config["Avito"].get("MAX_PRICE", "0")
         self.min_price_env = self.config["Avito"].get("MIN_PRICE", "0")
 
@@ -266,6 +275,7 @@ class Window(customtkinter.CTk):
         url = self.url_entry.get()
         num_ads = self.ads_entry.get() or 5
         keys = self.key_entry.get()
+        antikeys = self.antikey_entry.get()
         self.frequency = self.freq_entry.get() or 5
         max_price = self.max_price_entry.get() or 1000000
         min_price = self.min_price_entry.get() or 0
@@ -274,6 +284,7 @@ class Window(customtkinter.CTk):
             url=url,
             count=int(num_ads),
             keysword_list=keys.split(","),
+            antikeysword_list=antikeys.split(","),
             max_price=int(max_price),
             min_price=int(min_price),
         ).parse()
