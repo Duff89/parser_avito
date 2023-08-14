@@ -5,6 +5,7 @@ from notifiers.logging import NotificationHandler
 from seleniumbase import SB
 from loguru import logger
 from locator import LocatorAvito
+from random import choice
 
 
 class AvitoParse:
@@ -238,11 +239,15 @@ class AvitoParse:
 
     def parse(self):
         """Метод для вызова"""
+        _ua = choice(
+            list(map(str.rstrip, open("user_agent_pc.txt").readlines())))
+
         with SB(uc=True,
                 headless=True,
                 page_load_strategy="eager",
                 block_images=True,
-                skip_js_waits=True
+                skip_js_waits=True,
+                agent=_ua
                 ) as self.driver:
             try:
                 self.__get_url()
