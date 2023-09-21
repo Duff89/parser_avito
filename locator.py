@@ -1,6 +1,8 @@
 from selenium.webdriver.common.by import By
 
+
 class LocatorAvito:
+    """Все необходимые селекторы"""
     NEXT_BTN = (By.CSS_SELECTOR, "[data-marker*='pagination-button/next']")
     TITLES = (By.CSS_SELECTOR, "[data-marker='item']")
     NAME = (By.CSS_SELECTOR, "[itemprop='name']")
@@ -12,4 +14,5 @@ class LocatorAvito:
     SELLER_NAME = (By.CSS_SELECTOR, "[data-marker='seller-info/label']")
     COMPANY_NAME = (By.CSS_SELECTOR, "[data-marker='seller-link/link']")
     COMPANY_NAME_TEXT = (By.CSS_SELECTOR, "span")
+    GEO = (By.CSS_SELECTOR, "[class*='style-item-address']")
 

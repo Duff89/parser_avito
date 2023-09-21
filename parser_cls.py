@@ -1,6 +1,8 @@
 import os
+import random
 import time
 import csv
+import re
 from notifiers.logging import NotificationHandler
 from seleniumbase import SB
 from loguru import logger
@@ -10,10 +12,6 @@ from locator import LocatorAvito
 class AvitoParse:
     """
     Парсинг  товаров на avito.ru
-    url - начальный url
-    keysword_list- список ключевых слов
-    count - сколько проверять страниц
-    tg_token - токен telegram, если не передать- не будет отправки в телегу, результат будет в файле и консоли
     """
 
     def __init__(self,
@@ -23,6 +21,8 @@ class AvitoParse:
                  tg_token: str = None,
                  max_price: int = 0,
                  min_price: int = 0,
+                 geo: str = None,
+                 debug_mode: int = 0
 
                  ):
         self.url = url
@@ -33,12 +33,17 @@ class AvitoParse:
         self.title_file = self.__get_file_title()
         self.max_price = int(max_price)
         self.min_price = int(min_price)
-
-
+        self.geo = geo
+        self.debug_mode = debug_mode
 
     def __get_url(self):
         self.driver.open(self.url)
-        self.driver.open_new_window() # сразу открываем и вторую вкладку
+
+        if "Доступ ограничен" in self.driver.get_title():
+            time.sleep(10)
+            raise Exception("Перезапуск из-за блокировки IP")
+
+        self.driver.open_new_window()  # сразу открываем и вторую вкладку
         self.driver.switch_to_window(window=0)
 
     def __paginator(self):
@@ -47,6 +52,7 @@ class AvitoParse:
         self.__create_file_csv()
         while self.count > 0:
             self.__parse_page()
+            time.sleep(random.randint(5, 7))
             """Проверяем есть ли кнопка далее"""
             if self.driver.find_elements(LocatorAvito.NEXT_BTN[1], by="css selector"):
                 self.driver.find_element(LocatorAvito.NEXT_BTN[1], by="css selector").click()
@@ -71,9 +77,7 @@ class AvitoParse:
                 self.viewed_list = []
 
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
-        self.driver.save_screenshot("1.png")
         for title in titles:
-            self.driver.save_screenshot("1.png")
             name = title.find_element(*LocatorAvito.NAME).text
 
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
@@ -99,14 +103,20 @@ class AvitoParse:
                 if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]) \
                         and \
                         self.min_price <= int(
-                        price) <= self.max_price:
+                    price) <= self.max_price:
                     self.data.append(self.__parse_full_page(url, data))
+                    """Проверка адреса если нужно"""
+                    if self.geo and self.geo.lower() not in self.data[-1].get("geo", self.geo.lower()):
+                        continue
                     """Отправляем в телеграм"""
                     self.__pretty_log(data=data)
                     self.__save_data(data=data)
             elif self.min_price <= int(price) <= self.max_price:
 
                 self.data.append(self.__parse_full_page(url, data))
+                """Проверка адреса если нужно"""
+                if self.geo and self.geo.lower() not in self.data[-1].get("geo", self.geo.lower()):
+                    continue
                 """Отправляем в телеграм"""
                 self.__pretty_log(data=data)
                 self.__save_data(data=data)
@@ -138,10 +148,16 @@ class AvitoParse:
                 logger.success("Доступ ограничен: проблема с IP. \nПоследние объявления будут без подробностей")
 
             self.driver.switch_to_window(window=0)
+            logger.debug("Не дождался загрузки страницы")
             return data
 
+        """Гео"""
+        if self.geo and self.driver.find_elements(LocatorAvito.GEO[1], by="css selector"):
+            geo = self.driver.find_element(LocatorAvito.GEO[1], by="css selector").text
+            data["geo"] = geo.lower()
+
         """Количество просмотров"""
-        if self.driver.find_elements(LocatorAvito.TOTAL_VIEWS[1], by="css selector" ):
+        if self.driver.find_elements(LocatorAvito.TOTAL_VIEWS[1], by="css selector"):
             total_views = self.driver.find_element(LocatorAvito.TOTAL_VIEWS[1]).text.split()[0]
             data["views"] = total_views
 
@@ -169,7 +185,6 @@ class AvitoParse:
 
     def __save_data(self, data: dict):
         """Сохраняет результат в файл keyword*.csv"""
-
         with open(f"result/{self.title_file}.csv", mode="a", newline='', encoding='utf-8', errors='ignore') as file:
             writer = csv.writer(file)
             writer.writerow([
@@ -180,6 +195,7 @@ class AvitoParse:
                 data.get("views", '-'),
                 data.get("date_public", '-'),
                 data.get("seller_name", 'no'),
+                data.get("geo", '-')
             ])
 
         """сохраняет просмотренные объявления"""
@@ -219,6 +235,7 @@ class AvitoParse:
                     "Просмотров",
                     "Дата публикации",
                     "Продавец",
+                    "Адрес"
                 ])
 
     def __get_file_title(self) -> str:
@@ -230,14 +247,14 @@ class AvitoParse:
             title_file = 'all'
         return title_file
 
-
     def parse(self):
         """Метод для вызова"""
         with SB(uc=True,
-                headless=True,
+                headed=True if self.debug_mode else False,
+                headless=True if not self.debug_mode else False,
                 page_load_strategy="eager",
                 block_images=True,
-                skip_js_waits=True,
+                #skip_js_waits=True,
                 ) as self.driver:
             try:
                 self.__get_url()
@@ -246,14 +263,21 @@ class AvitoParse:
                 logger.error(f"Ошибка: {error}")
 
 
-
 if __name__ == '__main__':
     """Здесь заменить данные на свои"""
     import configparser
 
     config = configparser.ConfigParser()  # создаём объекта парсера
     config.read("settings.ini")  # читаем конфиг
-    url = config["Avito"]["URL"]
+
+    try:
+        """Багфикс проблем с экранированием"""
+        url = config["Avito"]["URL"]  # начальный url
+    except Exception:
+        with open('settings.ini') as file:
+            line_url = file.readlines()[1]
+            regex = r"http.+"
+            url = re.search(regex, line_url)[0]
     chat_id = config["Avito"]["CHAT_ID"]
     token = config["Avito"]["TG_TOKEN"]
     num_ads = config["Avito"]["NUM_ADS"]
@@ -261,6 +285,7 @@ if __name__ == '__main__':
     keys = config["Avito"]["KEYS"]
     max_price = config["Avito"].get("MAX_PRICE", "0") or "0"
     min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
+    geo = config["Avito"].get("GEO", "") or ""
 
     if token and chat_id:
         params = {
@@ -279,7 +304,8 @@ if __name__ == '__main__':
                 count=int(num_ads),
                 keysword_list=keys.split(","),
                 max_price=int(max_price),
-                min_price=int(min_price)
+                min_price=int(min_price),
+                geo=geo
             ).parse()
             logger.info("Пауза")
             time.sleep(int(freq) * 60)
