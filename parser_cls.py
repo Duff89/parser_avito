@@ -77,6 +77,7 @@ class AvitoParse:
                 self.viewed_list = []
 
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        items = []
         for title in titles:
             name = title.find_element(*LocatorAvito.NAME).text
 
@@ -88,16 +89,25 @@ class AvitoParse:
             url = title.find_element(*LocatorAvito.URL).get_attribute("href")
             price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
-
-            if self.is_viewed(ads_id):
-                continue
-            self.viewed_list.append(ads_id)
-            data = {
+            items.append({
                 'name': name,
                 'description': description,
                 'url': url,
-                'price': price
-            }
+                'price': price,
+                'ads_id': ads_id
+            })
+
+        for data in items:
+            ads_id = data.pop('ads_id')
+            name = data.get('name')
+            description = data.get('description')
+            url = data.get('url')
+            price = data.get('price')
+            
+            if self.is_viewed(ads_id):
+                continue
+            self.viewed_list.append(ads_id)
+
             """Определяем нужно ли нам учитывать ключевые слова"""
             if self.keys_word != ['']:
                 if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]) \
