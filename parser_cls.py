@@ -212,7 +212,7 @@ class AvitoParse:
                 reader = csv.reader(file)
                 try:
                     # Попытка чтения первой строки
-                    first_row = next(reader)
+                    next(reader)
                 except StopIteration:
                     # файл пустой
                     return True

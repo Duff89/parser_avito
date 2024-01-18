@@ -10,7 +10,9 @@ import re
 
 import customtkinter
 
-import threading, tkinter, time
+import time
+import tkinter
+import threading
 import webbrowser
 import configparser
 
@@ -172,12 +174,14 @@ class Window(customtkinter.CTk):
         """Основной цикл"""
         while self.is_run:
             self.run_parse()
-            if not self.is_run: break
+            if not self.is_run: 
+                break
             logger.info("Проверка завершена")
             logger.info(f"Пауза {self.frequency} минут")
-            for _ in range(int(self.frequency) * 60):
+            for _ in range(int(float(self.frequency) * 60)):
                 time.sleep(1)
-                if not self.is_run: break
+                if not self.is_run: 
+                    break
 
         """Убираем кнопку Стоп и создаем старт"""
         self.stop_button.destroy()
@@ -243,7 +247,8 @@ class Window(customtkinter.CTk):
         """Логирование в telegram"""
         token = self.token_entry.get()
         chat_id = self.chat_id_entry.get()
-        if self.tg_logger_init: return
+        if self.tg_logger_init: 
+            return
         if token and chat_id:
             params = {
                 'token': token,
