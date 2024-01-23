@@ -10,7 +10,9 @@ import re
 
 import customtkinter
 
-import threading, tkinter, time
+import time
+import tkinter
+import threading
 import webbrowser
 import configparser
 
@@ -128,8 +130,29 @@ class Window(customtkinter.CTk):
         self.checkbox = customtkinter.CTkCheckBox(self, text="режим отладки",
                                              variable=self.check_var, onvalue="on", offvalue="off")
         self.checkbox.grid(row=11, column=0)
-        # кнопка "Старт"
-        self.start_btn()
+
+        """Кнопка старт. Старт работы"""
+        self.start_button = customtkinter.CTkButton(self,
+                                                    text="Старт",
+                                                    command=lambda: self.is_run or
+                                                                    threading.Thread(
+                                                                        target=self.start_scraping).start())
+        self.start_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+
+        """Размещаем кнопку Стоп"""
+        self.stop_button = customtkinter.CTkButton(self, text="Стоп", command=self.stop_scraping)
+        self.stop_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+        # прячем кнопку стоп
+        self.stop_button.grid_forget()
+
+    def switch_action(self):
+        """Смена видимости кнопок старт и стоп"""
+        if self.start_button._last_geometry_manager_call is None:
+            self.start_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+            self.stop_button.grid_forget()
+        else:
+            self.stop_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
+            self.start_button.grid_forget()
 
     def telegram_log_test(self):
         """Тестирование отправки сообщения в telegram"""
@@ -157,14 +180,9 @@ class Window(customtkinter.CTk):
             return
         """Прячем кнопку старт"""
         self.is_run = True
-        self.start_button.configure(text='Работает', state='disabled')
-        self.start_button.destroy()
+        self.switch_action()
         self.update()
         logger.info("Начинаем поиск")
-
-        """Размещаем кнопку Стоп"""
-        self.stop_button = customtkinter.CTkButton(self, text="Стоп", command=self.stop_scraping)
-        self.stop_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
 
         """Сохраняем конфиг"""
         self.save_config()
@@ -172,28 +190,20 @@ class Window(customtkinter.CTk):
         """Основной цикл"""
         while self.is_run:
             self.run_parse()
-            if not self.is_run: break
+            if not self.is_run: 
+                break
             logger.info("Проверка завершена")
             logger.info(f"Пауза {self.frequency} минут")
-            for _ in range(int(self.frequency) * 60):
+            for _ in range(int(float(self.frequency) * 60)):
                 time.sleep(1)
-                if not self.is_run: break
+                if not self.is_run: 
+                    break
 
-        """Убираем кнопку Стоп и создаем старт"""
-        self.stop_button.destroy()
+        """Прячем кнопку Стоп и показываем старт"""
         logger.info("Успешно остановлено")
-        self.start_btn()
+        self.switch_action()
+        self.stop_button.configure(text='Стоп', state='normal')
         self.update()
-
-    def start_btn(self):
-        """Кнопка старт. Старт работы"""
-
-        self.start_button = customtkinter.CTkButton(self,
-                                                    text="Старт",
-                                                    command=lambda: self.is_run or
-                                                                    threading.Thread(
-                                                                        target=self.start_scraping).start())
-        self.start_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
 
     def stop_scraping(self):
         """Кнопка стоп. Остановка работы"""
@@ -243,7 +253,8 @@ class Window(customtkinter.CTk):
         """Логирование в telegram"""
         token = self.token_entry.get()
         chat_id = self.chat_id_entry.get()
-        if self.tg_logger_init: return
+        if self.tg_logger_init: 
+            return
         if token and chat_id:
             params = {
                 'token': token,
