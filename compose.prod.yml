@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  script:
+    image: parser_avito/script
+    build: .
+    restart: unless-stopped
+    volumes:
+      - /root/parser_avito/result:/app/result
+    command: bash -c "cd /app && python parser_cls.py"

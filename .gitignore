@@ -1,0 +1,11 @@
+# Cache
+__pycache__/
+
+# Environment
+venv/
+env/
+
+# Data
+downloaded_files/
+result/
+viewed.txt
