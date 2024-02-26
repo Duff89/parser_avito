@@ -22,8 +22,8 @@ class AvitoParse:
                  max_price: int = 0,
                  min_price: int = 0,
                  geo: str = None,
-                 debug_mode: int = 0
-
+                 delay: int = 0,
+                 debug_mode: int = 0,
                  ):
         self.url = url
         self.keys_word = keysword_list
@@ -34,6 +34,7 @@ class AvitoParse:
         self.max_price = int(max_price)
         self.min_price = int(min_price)
         self.geo = geo
+        self.delay = delay
         self.debug_mode = debug_mode
 
     def __get_url(self):
@@ -103,7 +104,7 @@ class AvitoParse:
             description = data.get('description')
             url = data.get('url')
             price = data.get('price')
-            
+
             if self.is_viewed(ads_id):
                 continue
             self.viewed_list.append(ads_id)
@@ -132,6 +133,10 @@ class AvitoParse:
                 self.__save_data(data=data)
             else:
                 continue
+
+            if self.delay:
+                logger.info(f"Пауза {self.delay} сек")
+                time.sleep(self.delay)
 
     def __pretty_log(self, data):
         """Красивый вывод"""
@@ -292,6 +297,7 @@ if __name__ == '__main__':
     token = config["Avito"]["TG_TOKEN"]
     num_ads = config["Avito"]["NUM_ADS"]
     freq = config["Avito"]["FREQ"]
+    delay = config["Avito"]["DELAY"] or "0"
     keys = config["Avito"]["KEYS"]
     max_price = config["Avito"].get("MAX_PRICE", "0") or "0"
     min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
@@ -315,9 +321,10 @@ if __name__ == '__main__':
                 keysword_list=keys.split(","),
                 max_price=int(max_price),
                 min_price=int(min_price),
-                geo=geo
+                geo=geo,
+                delay=int(delay),
             ).parse()
-            logger.info("Пауза")
+            logger.info(f"Пауза {int(freq)} мин")
             time.sleep(int(freq) * 60)
         except Exception as error:
             logger.error(error)
