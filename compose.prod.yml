@@ -18,16 +18,20 @@ services:
       DATABASE_URL: postgres://jitsu:asdr1234@db/jitsu?sslmode=disable
       CONFIGURATOR_SECRET: asdr1234
     volumes:
-      # - ./jitsu.conf:/home/jitsu/config
+      - ./jitsu.conf:/home/jitsu/config
       - /root/data/jitsu:/var/lib/jitsu/data
 
   db:
     image: postgres:13
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: jitsu
       POSTGRES_PASSWORD: asdr1234
       POSTGRES_DB: jitsu
     volumes:
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf
       - /root/data/pg:/var/lib/postgresql/data
 
 volumes:
