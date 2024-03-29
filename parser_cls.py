@@ -41,11 +41,11 @@ class AvitoParse:
         self.delay = delay
         self.debug_mode = debug_mode
 
-    def __get_url(self):
+    async def __get_url(self):
         self.driver.open(self.url)
 
         if "Доступ ограничен" in self.driver.get_title():
-            time.sleep(10)
+            await asyncio.sleep(10)
             raise Exception("Перезапуск из-за блокировки IP")
 
         self.driver.open_new_window()  # сразу открываем и вторую вкладку
@@ -53,12 +53,14 @@ class AvitoParse:
 
     async def __paginator(self):
         """Кнопка далее"""
+
         logger.info("Страница успешно загружена. Просматриваю объявления")
-        self.__create_file_csv()
+        # self.__create_file_csv()
+
         while self.count > 0:
             await self.__parse_page()
 
-            time.sleep(random.randint(5, 7))
+            await asyncio.sleep(random.randint(5, 7))
             """Проверяем есть ли кнопка далее"""
             if self.driver.find_elements(LocatorAvito.NEXT_BTN[1], by="css selector"):
                 self.driver.find_element(
@@ -75,6 +77,7 @@ class AvitoParse:
         """Парсит открытую страницу"""
 
         """Ограничение количества просмотренных объявлений"""
+
         if os.path.isfile("viewed.txt"):
             with open("viewed.txt", "r") as file:
                 self.viewed_list = list(map(str.rstrip, file.readlines()))
@@ -156,7 +159,7 @@ class AvitoParse:
 
             if self.delay:
                 logger.info(f"Пауза {self.delay} сек")
-                time.sleep(self.delay)
+                await asyncio.sleep(self.delay)
 
     def __pretty_log(self, data):
         """Красивый вывод"""
@@ -232,6 +235,8 @@ class AvitoParse:
         return False
 
     async def __save_data(self, data: dict):
+        logger.info("JITSU")
+
         link = "http://104.248.143.154:8080/api/s/s2s/track"
         code, res = await fetch(
             link,
@@ -323,7 +328,7 @@ class AvitoParse:
             # skip_js_waits=True,
         ) as self.driver:
             try:
-                self.__get_url()
+                await self.__get_url()
                 await self.__paginator()
             except Exception as error:
                 logger.error(f"Ошибка: {error}")
@@ -372,7 +377,7 @@ async def main():
                 delay=int(delay),
             ).parse()
             logger.info(f"Пауза {int(freq)} мин")
-            time.sleep(int(freq) * 60)
+            await asyncio.sleep(int(freq) * 60)
         except Exception as error:
             logger.error(error)
             logger.error(
@@ -380,7 +385,7 @@ async def main():
                 "Если ошибка повторится несколько раз - перезапустите скрипт."
                 "Если и это не поможет - обратитесь к разработчику по ссылке ниже"
             )
-            asyncio.sleep(30)
+            await asyncio.sleep(30)
 
 
 if __name__ == "__main__":
