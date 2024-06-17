@@ -73,8 +73,7 @@ class AvitoParse:
                 if len(self.viewed_list) > 5000:
                     self.viewed_list = self.viewed_list[-900:]
         else:
-            with open('viewed.txt', 'w') as file:
-                self.viewed_list = []
+            self.viewed_list = []
 
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
         items = []
