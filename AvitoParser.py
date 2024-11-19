@@ -1,320 +1,341 @@
-#!/usr/bin/env python3
-
-"""
-AvitoParser - Поиск объявлений на avito.ru по цене или ключевым словам
-by Duff89 (https://github.com/Duff89)
-"""
-__version__ = 1.09
-
-import re
-
-import customtkinter
-
-import threading, tkinter, time
-import webbrowser
 import configparser
+import re
+import threading
+import time
 
+import flet as ft
 from loguru import logger
 from notifiers.logging import NotificationHandler
 
+__VERSION__ = "2.0"
+
+from lang import *
 from parser_cls import AvitoParse
 
-customtkinter.set_appearance_mode("dark")
 
+def main(page: ft.Page):
+    page.title = f'Parser Avito v {__VERSION__}'
+    page.theme_mode = ft.ThemeMode.DARK
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.window.width = 1000
+    page.window.height = 920
+    page.window.min_width = 650
+    page.window.min_height = 920
+    page.padding = 20
+    tg_logger_init = False
+    config = configparser.ConfigParser()
+    config.read("settings.ini", encoding='utf-8')
+    is_run = False
+    stop_event = threading.Event()
 
-class Window(customtkinter.CTk):
-    def __init__(self):
-        super().__init__()
-        self.geometry("720x800")
-        self.width_entry_field = 500
-        self.resizable(width=True, height=True)
-        self.title(f"AvitoParser v. {__version__}")
-        self.is_run = False
-        self.main_windows_init()
-        self.logger_widget_init()
-        self.tg_logger_init = False
-
-        """Центрируем окно относительно экрана"""
-        self.update_idletasks()
-        screen_width = self.winfo_screenwidth()
-        screen_height = self.winfo_screenheight()
-        window_width = self.winfo_width()
-        window_height = self.winfo_height()
-        x_pos = (screen_width - window_width) // 2
-        y_pos = (screen_height - window_height) // 2
-        self.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
-
-        self.checkbox_frame = FeedbackFrame(self)
-        self.checkbox_frame.grid(row=11, column=0, columnspan=2, pady=10, sticky="s")
-
-    def main_windows_init(self):
-        """Инициализация всех полей"""
-        self.set_up()
-        self.token_label = customtkinter.CTkLabel(self, text="Token:")
-        self.token_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.token_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                  placeholder_text="Введите токен вашего Telegram бота")
-        self.token_entry.grid(row=0, column=1, pady=5, sticky='w')
-        self.token_entry.insert(0, self.tg_token_env)
-
-        self.chat_id_label = customtkinter.CTkLabel(self, text="Chat ID:")
-        self.chat_id_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.chat_id_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                    placeholder_text="Введите ID чата вашего диалога в Telegram")
-        self.chat_id_entry.grid(row=1, column=1, pady=5, sticky='w')
-        self.chat_id_entry.insert(0, self.chat_id_env)
-
-        self.key_label = customtkinter.CTkLabel(self, text="Ключевые слова:")
-        self.key_label.grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.key_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                placeholder_text="Через запятую(регистр не важен)")
-        self.key_entry.grid(row=2, column=1, pady=5, sticky='w')
-        self.key_entry.insert(0, self.keys_env)
-
-        self.ads_label = customtkinter.CTkLabel(self, text="Количество страниц:")
-        self.ads_label.grid(row=3, column=0, padx=10, pady=5, sticky="w")
-        self.ads_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                placeholder_text="Сколько страниц проверять каждый раз")
-        self.ads_entry.grid(row=3, column=1, pady=5, sticky='w')
-        self.ads_entry.insert(0, self.num_ads_env)
-
-        self.freq_label = customtkinter.CTkLabel(self, text="Пауза в минутах:")
-        self.freq_label.grid(row=4, column=0, padx=10, pady=5, sticky="w")
-        self.freq_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                 placeholder_text="Пауза между повторами. В минутах")
-        self.freq_entry.grid(row=4, column=1, pady=5, sticky='w')
-        self.freq_entry.insert(0, self.freq_env)
-
-        self.url_label = customtkinter.CTkLabel(self, text="Url:")
-        self.url_label.grid(row=5, column=0, padx=10, pady=5, sticky="w")
-        self.url_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                placeholder_text="Адрес с которого нужно начинать")
-        self.url_entry.grid(row=5, column=1, pady=5, sticky='w')
-        self.url_entry.insert(0, self.start_url_env)
-
-        self.clear_button = customtkinter.CTkButton(self, text="X", width=1,
-                                                    command=lambda: self.url_entry.delete(0, 1000))
-        self.clear_button.grid(row=5, column=3)
-
-        self.min_price_label = customtkinter.CTkLabel(self, text="Минимальная цена:")
-        self.min_price_label.grid(row=6, column=0, padx=10, pady=5, sticky="w")
-        self.min_price_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                      placeholder_text="Цена больше либо равна введенному значению")
-        self.min_price_entry.grid(row=6, column=1, pady=5, sticky='w')
-        self.min_price_entry.insert(0, str(self.min_price_env))
-
-        self.max_price_label = customtkinter.CTkLabel(self, text="Максимальная цена:")
-        self.max_price_label.grid(row=7, column=0, padx=10, pady=5, sticky="w")
-        self.max_price_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                      placeholder_text="Цена меньше либо равна введенному значению")
-        self.max_price_entry.grid(row=7, column=1, pady=5, sticky='w')
-        self.max_price_entry.insert(0, str(self.max_price_env))
-
-        """гео"""
-        self.geo_label = customtkinter.CTkLabel(self, text="Ограничение по городу:")
-        self.geo_label.grid(row=8, column=0, padx=10, pady=5, sticky="w")
-        self.geo_entry = customtkinter.CTkEntry(self, width=self.width_entry_field,
-                                                      placeholder_text="Введите текст, который должен быть в"
-                                                                       " адресе обязательно")
-        self.geo_entry.grid(row=8, column=1, pady=5, sticky='w')
-        self.geo_entry.insert(0, str(self.geo_env))
-
-        self.test_button = customtkinter.CTkButton(self, text="Получить тестовое уведомление",
-                                                   command=self.telegram_log_test)
-        self.test_button.grid(row=9, column=1, pady=5, padx=(0, 6), sticky="ew")
-
-        """debug mode"""
-        self.check_var = customtkinter.StringVar(value="off")
-        self.checkbox = customtkinter.CTkCheckBox(self, text="режим отладки",
-                                             variable=self.check_var, onvalue="on", offvalue="off")
-        self.checkbox.grid(row=11, column=0)
-        # кнопка "Старт"
-        self.start_btn()
-
-    def telegram_log_test(self):
-        """Тестирование отправки сообщения в telegram"""
-        # if not self.tg_logger_init:
-        self.logger_tg()
-        token = self.token_entry.get()
-        chat_id = self.chat_id_entry.get()
-        if all([token, chat_id]):
-            logger.success('test')
-
-            logger.info('Если сообщение пришло к Вам в telegram - значит всё настроено правильно. Если нет - '
-                        'результат парсинга всегда можно посмотреть в папке result или ниже')
-            return None
-        logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
-
-    def start_scraping(self):
-        """Кнопка старт. Запуск"""
-        self.logger_tg()
-
-        """Если URL все-таки не заполнен"""
-        url = self.url_entry.get()
-        if not url:
-            logger.info("Внимание! URL - обязательный параметр. Пример ссылки:")
-            logger.info("https://www.avito.ru/moskva/remont_i_stroitelstvo/sadovaya_tehnika-ASgBAgICAURYnAI")
-            return
-        """Прячем кнопку старт"""
-        self.is_run = True
-        self.start_button.configure(text='Работает', state='disabled')
-        self.start_button.destroy()
-        self.update()
-        logger.info("Начинаем поиск")
-
-        """Размещаем кнопку Стоп"""
-        self.stop_button = customtkinter.CTkButton(self, text="Стоп", command=self.stop_scraping)
-        self.stop_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
-
-        """Сохраняем конфиг"""
-        self.save_config()
-
-        """Основной цикл"""
-        while self.is_run:
-            self.run_parse()
-            if not self.is_run: break
-            logger.info("Проверка завершена")
-            logger.info(f"Пауза {self.frequency} минут")
-            for _ in range(int(self.frequency) * 60):
-                time.sleep(1)
-                if not self.is_run: break
-
-        """Убираем кнопку Стоп и создаем старт"""
-        self.stop_button.destroy()
-        logger.info("Успешно остановлено")
-        self.start_btn()
-        self.update()
-
-    def start_btn(self):
-        """Кнопка старт. Старт работы"""
-
-        self.start_button = customtkinter.CTkButton(self,
-                                                    text="Старт",
-                                                    command=lambda: self.is_run or
-                                                                    threading.Thread(
-                                                                        target=self.start_scraping).start())
-        self.start_button.grid(row=9, column=0, padx=5, pady=5, sticky="ew")
-
-    def stop_scraping(self):
-        """Кнопка стоп. Остановка работы"""
-
-        logger.info("Идет остановка. Пожалуйста, подождите")
-        self.is_run = False
-        self.stop_button.configure(text='Останавливаюсь', state='disabled')
-        self.update()
-
-    def set_up(self):
+    def set_up():
         """Работа с настройками"""
-
-        self.config = configparser.ConfigParser()  # создаём объекта парсера
-        self.config.read("settings.ini", encoding='utf-8')  # читаем конфиг
+        nonlocal config
         try:
-            """Багфикс проблем с экранированием"""
-            self.start_url_env = self.config["Avito"]["URL"]
-        except Exception:
+            """Багфикс возможных проблем с экранированием"""
+            url_input.value = "\n".join(config["Avito"]["URL"].split(","))
+        except Exception as err:
+            logger.debug(f"Ошибка url при открытии конфига: {err}")
             with open('settings.ini') as file:
                 line_url = file.readlines()[1]
                 regex = r"http.+"
-                self.start_url_env = re.search(regex, line_url)[0]
-        self.chat_id_env = self.config["Avito"]["CHAT_ID"]
-        self.tg_token_env = self.config["Avito"]["TG_TOKEN"]
-        self.num_ads_env = self.config["Avito"]["NUM_ADS"]
-        self.freq_env = self.config["Avito"]["FREQ"]
-        self.keys_env = self.config["Avito"]["KEYS"]
-        self.max_price_env = self.config["Avito"].get("MAX_PRICE", "0")
-        self.min_price_env = self.config["Avito"].get("MIN_PRICE", "0")
-        self.geo_env = self.config["Avito"].get("GEO", "")
+                all_links = re.findall(regex, line_url)
+                if all_links:
+                    url_input.value = "\n".join(all_links)
+                url_input.value = re.findall(regex, line_url)[0]
+        tg_chat_id.value = "\n".join(config["Avito"]["CHAT_ID"].split(","))
+        tg_token.value = config["Avito"]["TG_TOKEN"]
+        count_page.value = config["Avito"]["NUM_ADS"]
+        pause_sec.value = config["Avito"]["FREQ"]
+        keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
+        max_price.value = config["Avito"].get("MAX_PRICE", "0")
+        min_price.value = config["Avito"].get("MIN_PRICE", "0")
+        geo.value = config["Avito"].get("GEO", "")
+        proxy.value = config["Avito"].get("PROXY", "")
+        proxy_change_ip.value = config["Avito"].get("PROXY_CHANGE_IP", "")
+        need_more_info.value = True if config["Avito"].get("NEED_MORE_INFO", "0") == "1" else False
+        debug_mode.value = True if config["Avito"].get("DEBUG_MODE", "0") == "1" else False
+        page.update()
 
-    def save_config(self):
+    def save_config():
         """Сохраняет конфиг"""
-        self.config["Avito"]["TG_TOKEN"] = self.token_entry.get()
-        self.config["Avito"]["CHAT_ID"] = self.chat_id_entry.get()
-        self.config["Avito"]["URL"] = str(self.url_entry.get()).replace('%', '%%')  # bugfix
-        self.config["Avito"]["NUM_ADS"] = self.ads_entry.get()
-        self.config["Avito"]["FREQ"] = self.freq_entry.get()
-        self.config["Avito"]["KEYS"] = self.key_entry.get()
-        self.config["Avito"]["MAX_PRICE"] = self.max_price_entry.get()
-        self.config["Avito"]["MIN_PRICE"] = self.min_price_entry.get()
-        self.config["Avito"]["GEO"] = self.geo_entry.get()
+        config["Avito"]["TG_TOKEN"] = tg_token.value
+        config["Avito"]["CHAT_ID"] = ",".join(tg_chat_id.value.split())
+        config["Avito"]["URL"] = ",".join(str(url_input.value).replace('%', '%%').split())  # bugfix
+        config["Avito"]["NUM_ADS"] = count_page.value
+        config["Avito"]["FREQ"] = pause_sec.value
+        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split())
+        config["Avito"]["MAX_PRICE"] = max_price.value
+        config["Avito"]["MIN_PRICE"] = min_price.value
+        config["Avito"]["GEO"] = geo.value
+        config["Avito"]["PROXY"] = proxy.value
+        config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
+        config["Avito"]["NEED_MORE_INFO"] = "1" if need_more_info.value else "0"
+        config["Avito"]["DEBUG_MODE"] = "1" if debug_mode.value else "0"
         with open('settings.ini', 'w', encoding='utf-8') as configfile:
-            self.config.write(configfile)
+            config.write(configfile)
+        logger.debug("Настройки сохранены")
 
-    def logger_tg(self):
+    def check_tg_btn(e):
+        if len(tg_chat_id.value) > 5 and len(tg_token.value) > 10:
+            btn_test_tg.disabled = False
+        else:
+            btn_test_tg.disabled = True
+        page.update()
+
+    def close_dlg(e):
+        dlg_modal_proxy.open = False
+        page.update()
+
+    def logger_console_init():
+        logger.add(logger_console_widget, format="{time:HH:mm:ss} - {message}")
+
+    def logger_console_widget(message):
+        console_widget.value += message
+        page.update()
+
+    def logger_tg():
         """Логирование в telegram"""
-        token = self.token_entry.get()
-        chat_id = self.chat_id_entry.get()
-        if self.tg_logger_init: return
-        if token and chat_id:
-            params = {
-                'token': token,
-                'chat_id': chat_id
-            }
-            tg_handler = NotificationHandler("telegram", defaults=params)
+        nonlocal tg_logger_init
+        token = tg_token.value
+        chat_ids = tg_chat_id.value.split()
 
-            """Все логи уровня SUCCESS и выше отсылаются в телегу"""
-            logger.add(tg_handler, level="SUCCESS", format="{message}")
-            self.tg_logger_init = True
+        if tg_logger_init:
+            return
+
+        if token and chat_ids:
+            for chat_id in chat_ids:
+                params = {
+                    'token': token,
+                    'chat_id': chat_id
+                }
+                tg_handler = NotificationHandler("telegram", defaults=params)
+
+                """Все логи уровня SUCCESS и выше отсылаются в телегу"""
+                logger.add(tg_handler, level="SUCCESS", format="{message}")
+
+            tg_logger_init = True
             return None
+
         logger.info("Данные для отправки в telegram не заполнены. Результат будет сохранен в файл и выведен здесь")
 
-    def logger_widget_init(self):
-        """Инициализация логирования в widget"""
-        self.log_widget = customtkinter.CTkTextbox(self, wrap="word", width=650, height=300, text_color="#00ff26")
-        self.log_widget.grid(row=10, padx=5, pady=(10, 0), column=0, columnspan=2)
-        logger.add(self.logger_text_widget, format="{time:HH:mm:ss} - {message}")
-        logger.info("Запуск AvitoParser")
-        logger.info("Чтобы начать работу, проверьте, чтобы поле URL было заполненными, "
-                    "остальное на Ваше усмотрение. Нужна помощь - нажмите на ссылку внизу окна.")
-        logger.info("Удачного поиска !!!")
+    def telegram_log_test(e):
+        """Тестирование отправки сообщения в telegram"""
+        logger_tg()
+        token = tg_token.value
+        chat_id = tg_chat_id.value
+        if all([token, chat_id]):
+            logger.success('test')
 
-    def logger_text_widget(self, message):
-        """Логирование в log_widget (окно приложения)"""
-        self.log_widget.insert(tkinter.END, message)
-        self.log_widget.see(tkinter.END)
+            logger.info(TG_TEST_MSG)
+            return None
+        logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
 
-    def run_parse(self):
-        """Запуск парсера"""
-        url = self.url_entry.get()
-        num_ads = self.ads_entry.get() or 5
-        keys = self.key_entry.get()
-        self.frequency = self.freq_entry.get() or 5
-        max_price = self.max_price_entry.get() or 1000000
-        min_price = self.min_price_entry.get() or 0
-        geo = self.geo_entry.get() or None
-        debug_status = 0
-        if self.checkbox.get() == 'on':
-            debug_status = 1
+    dlg_modal_proxy = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Подробнее насчёт прокси"),
+        content=ft.Container(
+            content=ft.Text(BUY_PROXY_LINK, size=20),
+            width=600,
+            height=400,
+            padding=10
+        ),
+        actions=[
+            ft.TextButton("Купить прокси",
+                          on_click=lambda e: page.launch_url(
+                              "https://mobileproxy.space/user.html?buyproxy&coupons_code=eMy-r4y-FZE-kMu")),
+            ft.TextButton("Отмена", on_click=close_dlg),
 
-        AvitoParse(
-            url=url,
-            count=int(num_ads),
-            keysword_list=keys.split(","),
-            max_price=int(max_price),
-            min_price=int(min_price),
-            geo=geo,
-            debug_mode=debug_status
-        ).parse()
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+        on_dismiss=lambda e: print("Modal dialog dismissed!"),
+    )
+
+    def open_dlg_modal(e):
+        page.overlay.append(dlg_modal_proxy)
+        dlg_modal_proxy.open = True
+        page.update()
+
+    def start_parser(e):
+        nonlocal is_run
+        logger.info("Старт")
+        stop_event.clear()
+        save_config()
+        console_widget.height = 700
+        input_fields.visible = False
+        start_btn.visible = False
+        stop_btn.visible = True
+        is_run = True
+        page.update()
+        while is_run and not stop_event.is_set():
+            run_process()
+            if not is_run:
+                return
+            logger.info("Пауза между повторами")
+            for _ in range(int(pause_sec.value if pause_sec.value else 300)):
+                time.sleep(1)
+                if not is_run:
+                    logger.info("Завершено")
+                    return
+
+    def stop_parser(e):
+        nonlocal is_run
+        stop_event.set()
+        logger.debug("Стоп")
+        is_run = False
+        console_widget.height = 100
+        input_fields.visible = True
+        stop_btn.visible = False
+        start_btn.visible = True
+        start_btn.text = "Останавливаюсь..."
+        start_btn.disabled = True
+        page.update()
+
+    def geo_change(e):
+        if geo.value:
+            need_more_info.value = True
+        page.update()
+
+    def run_process():
+        logger_tg()
+        parser = AvitoParse(
+            stop_event=stop_event,
+            url=url_input.value.split(),
+            count=int(count_page.value),
+            keysword_list=keyword_input.value.split(),
+            max_price=int(max_price.value),
+            min_price=int(min_price.value),
+            geo=geo.value,
+            proxy=proxy.value,
+            proxy_change_url=proxy_change_ip.value,
+            debug_mode=debug_mode.value,
+            need_more_info=need_more_info.value
+        )
+        parsing_thread = threading.Thread(target=parser.parse)
+        parsing_thread.start()
+        parsing_thread.join()
+        start_btn.disabled = False
+        start_btn.text = "Старт"
+        page.update()
+
+    label_required = ft.Text("Обязательные параметры", size=20)
+    url_input = ft.TextField(
+        label="Вставьте начальную ссылку или ссылки (до 5шт.). Используйте Enter между значениями",
+        multiline=True,
+        min_lines=1,
+        max_lines=5,
+        expand=True,
+        tooltip=URL_INPUT_HELP
+    )
+    min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, tooltip=MIN_PRICE_HELP)
+    max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, tooltip=MAX_PRICE_HELP)
+    label_not_required = ft.Text("Дополнительные параметры")
+    keyword_input = ft.TextField(
+        label="Ключевые слова. Используйте Enter между значениями",
+        multiline=True,
+        min_lines=1,
+        max_lines=5,
+        width=400,
+        expand=True,
+        tooltip=KEYWORD_INPUT_HELP
+    )
+    count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP)
+    pause_sec = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, tooltip=PAUSE_SEC_HELP)
+    tg_token = ft.TextField(label="Token telegram", width=400, on_change=check_tg_btn, expand=True,
+                            tooltip=TG_TOKEN_HELP)
+    tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько", width=400, on_change=check_tg_btn,
+                              multiline=True, expand=True, tooltip=TG_CHAT_ID_HELP)
+    btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=True, on_click=telegram_log_test, expand=True,
+                                    tooltip=BTN_TEST_TG_HELP)
+    proxy = ft.TextField(label="Прокси в формате username:password@server:port", width=400, expand=True,
+                         tooltip=PROXY_HELP)
+    proxy_change_ip = ft.TextField(
+        label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=***", width=400,
+        expand=True, tooltip=PROXY_CHANGE_IP_HELP)
+    proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
+                                       tooltip=PROXY_BTN_HELP_HELP)
+    geo = ft.TextField(label="Ограничение по городу", width=400, on_change=geo_change, expand=True, tooltip=GEO_HELP)
+    start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
+    stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
+                                 style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
+    console_widget = ft.Text(width=800, height=100, color=ft.colors.GREEN, value="", selectable=True,
+                             expand=True)  # , bgcolor=ft.colors.GREY_50)
+    need_more_info = ft.Checkbox("Дополнительная информация", on_change=geo_change, tooltip=NEED_MORE_INFO_HELP)
+    debug_mode = ft.Checkbox("Режим отладки", tooltip=DEBUG_MODE_HELP)
+    buy_me_coffe_btn = ft.TextButton("Купить кофе разработчику",
+                                     on_click=lambda e: page.launch_url("https://yoomoney.ru/to/410014382689862"),
+                                     style=ft.ButtonStyle(color=ft.colors.GREEN_300), expand=True,
+                                     tooltip=BUY_ME_COFFE_BTN_HELP)
+    report_issue_btn = ft.TextButton("Сообщить о проблеме", on_click=lambda e: page.launch_url(
+        "https://github.com/Duff89/parser_avito/issues"), style=ft.ButtonStyle(color=ft.colors.GREY), expand=True,
+                                     tooltip=REPORT_ISSUE_BTN_HELP)
+    input_fields = ft.Column(
+        [
+            label_required,
+            url_input,
+            ft.Row(
+                [min_price, max_price],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            ft.Text(""),
+            label_not_required,
+
+            ft.Row(
+                [keyword_input, geo],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            ft.Row(
+                [count_page, pause_sec],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            ft.Row(
+                [tg_token, tg_chat_id],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            btn_test_tg,
+            ft.Row(
+                [proxy, proxy_change_ip],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            proxy_btn_help,
+            ft.Text(""),
+            ft.Row(
+                [need_more_info, debug_mode],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+
+        ],
+        expand=True,
+        alignment=ft.MainAxisAlignment.CENTER,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER
+    )
+
+    controls = ft.Column(
+        [console_widget,
+         start_btn,
+         stop_btn],
+        expand=True,
+        alignment=ft.MainAxisAlignment.CENTER,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER
+    )
+    other_btn = ft.Row([buy_me_coffe_btn, report_issue_btn], expand=True, alignment=ft.MainAxisAlignment.CENTER)
+    all_field = ft.Column([input_fields, controls, other_btn], alignment=ft.MainAxisAlignment.CENTER,
+                          horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+
+    def start_page():
+        page.add(all_field, )
+
+    set_up()
+    start_page()
+    logger_console_init()
 
 
-class FeedbackFrame(customtkinter.CTkFrame):
-    def __init__(self, master):
-        super().__init__(master)
-
-        link_label = customtkinter.CTkLabel(self, text="Связаться с автором или сообщить о проблеме",
-                                            text_color="grey60", cursor="hand2")
-        link_label.grid(column=1, row=1, padx=10, pady=5, )
-        link_label.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/Duff89/parser_avito#%D"
-                                                                    "0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC%D1%8B"))
-
-        link_label = customtkinter.CTkLabel(self, text="Поддержать развитие проекта",
-                                            text_color="grey60", cursor="hand2")
-        link_label.grid(column=1, row=2, padx=10)
-        link_label.bind("<Button-1>", lambda e: webbrowser.open_new("https://github.com/Duff89/parser_avito"
-                                                                    "#%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%B"
-                                                                    "A%D0%B0-%D1%80%D0%B0%D0%B7%D0%B2%D0%B8%D1%82%D0"
-                                                                    "%B8%D1%8F-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%"
-                                                                    "D1%82%D0%B0"))
-
-
-if __name__ == '__main__':
-    Window().mainloop()
+ft.app(
+    target=main,
+)

@@ -1,11 +1,17 @@
 import os
 import random
+import threading
 import time
 import csv
 import re
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+import requests
 from notifiers.logging import NotificationHandler
 from seleniumbase import SB
 from loguru import logger
+
+from custom_exception import StopEventException
 from locator import LocatorAvito
 
 
@@ -13,20 +19,23 @@ class AvitoParse:
     """
     Парсинг  товаров на avito.ru
     """
-
     def __init__(self,
-                 url: str,
+                 url: list,
                  keysword_list: list,
-                 count: int = 10,
+                 count: int = 5,
                  tg_token: str = None,
                  max_price: int = 0,
                  min_price: int = 0,
                  geo: str = None,
-                 debug_mode: int = 0
-
+                 debug_mode: int = 0,
+                 need_more_info: int = 1,
+                 proxy: str = None,
+                 proxy_change_url: str = None,
+                 stop_event=None,
                  ):
-        self.url = url
-        self.keys_word = keysword_list
+        self.url_list = url
+        self.url = None
+        self.keys_word = keysword_list or None
         self.count = count
         self.data = []
         self.tg_token = tg_token
@@ -35,37 +44,68 @@ class AvitoParse:
         self.min_price = int(min_price)
         self.geo = geo
         self.debug_mode = debug_mode
+        self.need_more_info = need_more_info
+        self.proxy = proxy
+        self.proxy_change_url = proxy_change_url
+        self.stop_event = stop_event or threading.Event()
+
+    @property
+    def use_proxy(self) -> bool:
+        return all([self.proxy, self.proxy_change_url])
+
+    def ip_block(self) -> None:
+        if self.use_proxy:
+            logger.info("Блок IP")
+            self.change_ip()
+        else:
+            logger.info("Блок IP. Прокси нет, поэтому делаю паузу")
+            time.sleep(random.randint(300, 350))
 
     def __get_url(self):
+        logger.info(f"Открываю страницу: {self.url}")
         self.driver.open(self.url)
 
         if "Доступ ограничен" in self.driver.get_title():
-            time.sleep(10)
-            raise Exception("Перезапуск из-за блокировки IP")
-
-        self.driver.open_new_window()  # сразу открываем и вторую вкладку
-        self.driver.switch_to_window(window=0)
+            self.ip_block()
+            return self.__get_url()
 
     def __paginator(self):
         """Кнопка далее"""
         logger.info('Страница успешно загружена. Просматриваю объявления')
         self.__create_file_csv()
-        while self.count > 0:
-            self.__parse_page()
-            time.sleep(random.randint(5, 7))
-            """Проверяем есть ли кнопка далее"""
-            if self.driver.find_elements(LocatorAvito.NEXT_BTN[1], by="css selector"):
-                self.driver.find_element(LocatorAvito.NEXT_BTN[1], by="css selector").click()
-                self.count -= 1
-                logger.debug("Следующая страница")
-            else:
-                logger.info("Нет кнопки дальше")
+        for i in range(self.count):
+            if self.stop_event.is_set():
                 break
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1)
+            self.__parse_page()
+            time.sleep(random.randint(2, 4))
+            self.open_next_btn()
+        return
 
-    @logger.catch
+    def open_next_btn(self):
+        self.url = self.get_next_page_url(url=self.url)
+        logger.info("Следующая страница")
+        self.driver.uc_open(self.url)
+
+    @staticmethod
+    def get_next_page_url(url: str):
+        """Получает следующую страницу"""
+        try:
+            url_parts = urlparse(url)
+            query_params = parse_qs(url_parts.query)
+            current_page = int(query_params.get('p', [1])[0])
+            query_params['p'] = current_page + 1
+            new_query = urlencode(query_params, doseq=True)
+            next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,
+                                   url_parts.fragment))
+            return next_url
+        except Exception as err:
+            logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
+
     def __parse_page(self):
         """Парсит открытую страницу"""
-
+        self.check_stop_event()
         """Ограничение количества просмотренных объявлений"""
         if os.path.isfile('viewed.txt'):
             with open('viewed.txt', 'r') as file:
@@ -73,13 +113,15 @@ class AvitoParse:
                 if len(self.viewed_list) > 5000:
                     self.viewed_list = self.viewed_list[-900:]
         else:
-            with open('viewed.txt', 'w') as file:
+            with open('viewed.txt', 'w'):
                 self.viewed_list = []
 
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        logger.info(f"Вижу {len(titles)} объявлений на странице")
+        data_from_general_page = []
         for title in titles:
+            """Сбор информации с основной страницы"""
             name = title.find_element(*LocatorAvito.NAME).text
-
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
                 description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
             else:
@@ -98,32 +140,34 @@ class AvitoParse:
                 'url': url,
                 'price': price
             }
-            """Определяем нужно ли нам учитывать ключевые слова"""
-            if self.keys_word != ['']:
-                if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]) \
-                        and \
-                        self.min_price <= int(
-                    price) <= self.max_price:
-                    self.data.append(self.__parse_full_page(url, data))
-                    """Проверка адреса если нужно"""
-                    if self.geo and self.geo.lower() not in self.data[-1].get("geo", self.geo.lower()):
+            if self.min_price <= int(price) <= self.max_price:
+                if self.keys_word:
+                    if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]):
+                        data_from_general_page.append(data)
+                else:
+                    data_from_general_page.append(data)
+        if data_from_general_page:
+            self.__parse_other_data(item_info_list=data_from_general_page)
+
+    def __parse_other_data(self, item_info_list: list):
+        """Собирает доп. информацию для каждого объявления"""
+        for item_info in item_info_list:
+            try:
+                if self.stop_event.is_set():
+                    logger.info("Процесс будет остановлен")
+                    break
+                if self.need_more_info:
+                    item_info = self.__parse_full_page(item_info)
+                if self.geo and item_info.get("geo"):
+                    if not self.geo.lower() in str(item_info.get("geo")).lower():
                         continue
-                    """Отправляем в телеграм"""
-                    self.__pretty_log(data=data)
-                    self.__save_data(data=data)
-            elif self.min_price <= int(price) <= self.max_price:
+                self.__pretty_log(data=item_info)
+                self.__save_data(data=item_info)
+            except Exception as err:
+                logger.debug(err)
 
-                self.data.append(self.__parse_full_page(url, data))
-                """Проверка адреса если нужно"""
-                if self.geo and self.geo.lower() not in self.data[-1].get("geo", self.geo.lower()):
-                    continue
-                """Отправляем в телеграм"""
-                self.__pretty_log(data=data)
-                self.__save_data(data=data)
-            else:
-                continue
-
-    def __pretty_log(self, data):
+    @staticmethod
+    def __pretty_log(data):
         """Красивый вывод"""
         logger.success(
             f'\n{data.get("name", "-")}\n'
@@ -132,22 +176,25 @@ class AvitoParse:
             f'Просмотров: {data.get("views", "-")}\n'
             f'Дата публикации: {data.get("date_public", "-")}\n'
             f'Продавец: {data.get("seller_name", "-")}\n'
+            f'Адрес: {data.get("geo", "-")}\n'
             f'Ссылка: {data.get("url", "-")}\n')
 
-    def __parse_full_page(self, url: str, data: dict) -> dict:
-        """Парсит для доп. информации открытое объявление на отдельной вкладке"""
-        self.driver.switch_to_window(window=1)
-        self.driver.get(url)
-
+    def __parse_full_page(self, data: dict) -> dict:
+        """Парсит для доп. информации открытое объявление"""
+        self.driver.uc_open(data.get("url"))
+        if "Доступ ограничен" in self.driver.get_title():
+            logger.info("Доступ ограничен: проблема с IP")
+            self.ip_block()
+            return self.__parse_full_page(data=data)
         """Если не дождались загрузки"""
         try:
             self.driver.wait_for_element(LocatorAvito.TOTAL_VIEWS[1], by="css selector", timeout=10)
         except Exception:
             """Проверка на бан по ip"""
             if "Доступ ограничен" in self.driver.get_title():
-                logger.success("Доступ ограничен: проблема с IP. \nПоследние объявления будут без подробностей")
-
-            self.driver.switch_to_window(window=0)
+                logger.info("Доступ ограничен: проблема с IP")
+                self.ip_block()
+                return self.__parse_full_page(data=data)
             logger.debug("Не дождался загрузки страницы")
             return data
 
@@ -173,8 +220,6 @@ class AvitoParse:
             seller_name = self.driver.find_element(LocatorAvito.SELLER_NAME[1], by="css selector").text
             data["seller_name"] = seller_name
 
-        """Возвращается на вкладку №1"""
-        self.driver.switch_to_window(window=0)
         return data
 
     def is_viewed(self, ads_id: str) -> bool:
@@ -211,10 +256,8 @@ class AvitoParse:
             with open(f"result/{self.title_file}.csv", 'r', encoding='utf-8', errors='ignore') as file:
                 reader = csv.reader(file)
                 try:
-                    # Попытка чтения первой строки
                     first_row = next(reader)
                 except StopIteration:
-                    # файл пустой
                     return True
                 return False
         except FileNotFoundError:
@@ -240,75 +283,121 @@ class AvitoParse:
 
     def __get_file_title(self) -> str:
         """Определяет название файла"""
-        if self.keys_word != ['']:
+        if self.keys_word not in ['', None]:
             title_file = "-".join(list(map(str.lower, self.keys_word)))
-
         else:
             title_file = 'all'
         return title_file
 
     def parse(self):
         """Метод для вызова"""
-        with SB(uc=True,
-                headed=True if self.debug_mode else False,
-                headless=True if not self.debug_mode else False,
-                page_load_strategy="eager",
-                block_images=True,
-                #skip_js_waits=True,
-                ) as self.driver:
+        for _url in self.url_list:
+            self.url = _url
+            if self.stop_event and self.stop_event.is_set():
+                logger.info("Процесс будет остановлен")
+                return
+            with SB(uc=True,
+                    headed=True if self.debug_mode else False,
+                    headless=True if not self.debug_mode else False,
+                    page_load_strategy="eager",
+                    block_images=True,
+                    agent=random.choice(open("user_agent_pc.txt").readlines()),
+                    proxy=self.proxy
+                    ) as self.driver:
+                try:
+                    self.__get_url()
+                    self.__paginator()
+                except StopEventException:
+                    logger.info("Парсинг завершен")
+                    return
+                except Exception as err:
+                    logger.error(f"Ошибка: {err}")
+        self.stop_event.clear()
+        logger.info("Парсинг завершен")
+
+    def check_stop_event(self):
+        if self.stop_event.is_set():
+            logger.info("Процесс будет остановлен")
+            raise StopEventException()
+
+    def change_ip(self) -> bool:
+        logger.info("Меняю IP")
+        res = requests.get(url=self.proxy_change_url)
+        if res.status_code == 200:
+            logger.info("Запрос на смену IP отправлен. Жду изменения")
+        proxies = {
+            'https': f"http://{self.proxy}"
+        }
+        for i in range(10):
+            self.check_stop_event()
+            time.sleep(5)
             try:
-                self.__get_url()
-                self.__paginator()
-            except Exception as error:
-                logger.error(f"Ошибка: {error}")
+                response = requests.get(
+                    url="https://api.ipify.org?format=json",
+                    proxies=proxies)
+                if ip := response.json().get("ip"):
+                    logger.info(f"Новый IP {ip}")
+                    self.driver.delete_all_cookies()
+                    return True
+            except Exception as err:
+                logger.debug(err)
+                time.sleep(5)
+        return False
 
 
 if __name__ == '__main__':
-    """Здесь заменить данные на свои"""
     import configparser
 
     config = configparser.ConfigParser()  # создаём объекта парсера
-    config.read("settings.ini")  # читаем конфиг
+    config.read("settings.ini", encoding="utf-8")  # читаем конфиг
 
     try:
         """Багфикс проблем с экранированием"""
-        url = config["Avito"]["URL"]  # начальный url
+        url = config["Avito"]["URL"].split(",")
     except Exception:
-        with open('settings.ini') as file:
+        with open('settings.ini', encoding="utf-8") as file:
             line_url = file.readlines()[1]
             regex = r"http.+"
-            url = re.search(regex, line_url)[0]
-    chat_id = config["Avito"]["CHAT_ID"]
+            url = re.findall(regex, line_url)
+
+    chat_ids = config["Avito"]["CHAT_ID"].split(",")
     token = config["Avito"]["TG_TOKEN"]
     num_ads = config["Avito"]["NUM_ADS"]
     freq = config["Avito"]["FREQ"]
-    keys = config["Avito"]["KEYS"]
-    max_price = config["Avito"].get("MAX_PRICE", "0") or "0"
+    keys = config["Avito"]["KEYS"].split(",")
+    max_price = config["Avito"].get("MAX_PRICE", "9999999999") or "9999999999"
     min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
     geo = config["Avito"].get("GEO", "") or ""
+    proxy = config["Avito"].get("PROXY", "")
+    proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
+    need_more_info = config["Avito"]["NEED_MORE_INFO"]
 
-    if token and chat_id:
-        params = {
-            'token': token,
-            'chat_id': chat_id
-        }
-        tg_handler = NotificationHandler("telegram", defaults=params)
+    if token and chat_ids:
+        for chat_id in chat_ids:
+            params = {
+                'token': token,
+                'chat_id': chat_id
+            }
+            tg_handler = NotificationHandler("telegram", defaults=params)
 
-        """Все логи уровня SUCCESS и выше отсылаются в телегу"""
-        logger.add(tg_handler, level="SUCCESS", format="{message}")
+            """Все логи уровня SUCCESS и выше отсылаются в телегу"""
+            logger.add(tg_handler, level="SUCCESS", format="{message}")
 
     while True:
         try:
             AvitoParse(
                 url=url,
                 count=int(num_ads),
-                keysword_list=keys.split(","),
+                keysword_list=keys,
                 max_price=int(max_price),
                 min_price=int(min_price),
-                geo=geo
+                geo=geo,
+                need_more_info=1 if need_more_info else 0,
+                proxy=proxy,
+                proxy_change_url=proxy_change_ip
             ).parse()
             logger.info("Пауза")
-            time.sleep(int(freq) * 60)
+            time.sleep(int(freq))
         except Exception as error:
             logger.error(error)
             logger.error('Произошла ошибка, но работа будет продолжена через 30 сек. '
