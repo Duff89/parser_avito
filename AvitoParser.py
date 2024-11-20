@@ -7,7 +7,7 @@ import flet as ft
 from loguru import logger
 from notifiers.logging import NotificationHandler
 
-__VERSION__ = "2.0.1"
+__VERSION__ = "2.0.2"
 
 from lang import *
 from parser_cls import AvitoParse

@@ -370,7 +370,7 @@ if __name__ == '__main__':
     geo = config["Avito"].get("GEO", "") or ""
     proxy = config["Avito"].get("PROXY", "")
     proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
-    need_more_info = config["Avito"]["NEED_MORE_INFO"]
+    need_more_info = int(config["Avito"]["NEED_MORE_INFO"])
 
     if token and chat_ids:
         for chat_id in chat_ids:
