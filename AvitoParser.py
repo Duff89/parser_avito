@@ -7,7 +7,7 @@ import flet as ft
 from loguru import logger
 from notifiers.logging import NotificationHandler
 
-__VERSION__ = "2.0.2"
+__VERSION__ = "2.0.5"
 
 from lang import *
 from parser_cls import AvitoParse
@@ -20,7 +20,7 @@ def main(page: ft.Page):
     page.window.width = 1000
     page.window.height = 920
     page.window.min_width = 650
-    page.window.min_height = 920
+    page.window.min_height = 500
     page.padding = 20
     tg_logger_init = False
     config = configparser.ConfigParser()
@@ -47,7 +47,9 @@ def main(page: ft.Page):
         tg_token.value = config["Avito"]["TG_TOKEN"]
         count_page.value = config["Avito"]["NUM_ADS"]
         pause_sec.value = config["Avito"]["FREQ"]
+        max_view.value = config["Avito"].get("MAX_VIEW")
         keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
+        black_keyword_input.value = "\n".join(config["Avito"].get("KEYS_BLACK", "").split(","))
         max_price.value = config["Avito"].get("MAX_PRICE", "0")
         min_price.value = config["Avito"].get("MIN_PRICE", "0")
         geo.value = config["Avito"].get("GEO", "")
@@ -55,6 +57,7 @@ def main(page: ft.Page):
         proxy_change_ip.value = config["Avito"].get("PROXY_CHANGE_IP", "")
         need_more_info.value = True if config["Avito"].get("NEED_MORE_INFO", "0") == "1" else False
         debug_mode.value = True if config["Avito"].get("DEBUG_MODE", "0") == "1" else False
+        fast_speed.value = True if config["Avito"].get("FAST_SPEED", "0") == "1" else False
         page.update()
 
     def save_config():
@@ -65,13 +68,16 @@ def main(page: ft.Page):
         config["Avito"]["NUM_ADS"] = count_page.value
         config["Avito"]["FREQ"] = pause_sec.value
         config["Avito"]["KEYS"] = ",".join(keyword_input.value.split())
+        config["Avito"]["KEYS_BLACK"] = ",".join(black_keyword_input.value.split())
         config["Avito"]["MAX_PRICE"] = max_price.value
         config["Avito"]["MIN_PRICE"] = min_price.value
+        config["Avito"]["MAX_VIEW"] = min_price.value
         config["Avito"]["GEO"] = geo.value
         config["Avito"]["PROXY"] = proxy.value
         config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
         config["Avito"]["NEED_MORE_INFO"] = "1" if need_more_info.value else "0"
         config["Avito"]["DEBUG_MODE"] = "1" if debug_mode.value else "0"
+        config["Avito"]["FAST_SPEED"] = "1" if fast_speed.value else "0"
         with open('settings.ini', 'w', encoding='utf-8') as configfile:
             config.write(configfile)
         logger.debug("Настройки сохранены")
@@ -191,8 +197,8 @@ def main(page: ft.Page):
         start_btn.disabled = True
         page.update()
 
-    def geo_change(e):
-        if geo.value:
+    def required_field_for_more_info(e):
+        if geo.value or max_view.value:
             need_more_info.value = True
         page.update()
 
@@ -203,13 +209,15 @@ def main(page: ft.Page):
             url=url_input.value.split(),
             count=int(count_page.value),
             keysword_list=keyword_input.value.split(),
+            keysword_black_list=black_keyword_input.value.split(),
             max_price=int(max_price.value),
             min_price=int(min_price.value),
             geo=geo.value,
             proxy=proxy.value,
             proxy_change_url=proxy_change_ip.value,
             debug_mode=debug_mode.value,
-            need_more_info=need_more_info.value
+            need_more_info=need_more_info.value,
+            fast_speed=fast_speed.value
         )
         parsing_thread = threading.Thread(target=parser.parse)
         parsing_thread.start()
@@ -220,18 +228,18 @@ def main(page: ft.Page):
 
     label_required = ft.Text("Обязательные параметры", size=20)
     url_input = ft.TextField(
-        label="Вставьте начальную ссылку или ссылки (до 5шт.). Используйте Enter между значениями",
+        label="Вставьте начальную ссылку или ссылки. Используйте Enter между значениями",
         multiline=True,
         min_lines=1,
-        max_lines=5,
+        max_lines=50,
         expand=True,
-        tooltip=URL_INPUT_HELP
+        tooltip=URL_INPUT_HELP,
     )
     min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, tooltip=MIN_PRICE_HELP)
     max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, tooltip=MAX_PRICE_HELP)
     label_not_required = ft.Text("Дополнительные параметры")
     keyword_input = ft.TextField(
-        label="Ключевые слова. Используйте Enter между значениями",
+        label="Ключевые слова (через Enter)",
         multiline=True,
         min_lines=1,
         max_lines=5,
@@ -239,8 +247,19 @@ def main(page: ft.Page):
         expand=True,
         tooltip=KEYWORD_INPUT_HELP
     )
+    black_keyword_input = ft.TextField(
+        label="Черный список ключевых слов (через Enter)",
+        multiline=True,
+        min_lines=1,
+        max_lines=5,
+        width=400,
+        expand=True,
+        tooltip=KEYWORD_BLACK_INPUT_HELP
+    )
     count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP)
     pause_sec = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, tooltip=PAUSE_SEC_HELP)
+    max_view = ft.TextField(label="Макс. просмотров", width=400, expand=True, tooltip=MAX_VIEW_HELP,
+                            on_change=required_field_for_more_info)
     tg_token = ft.TextField(label="Token telegram", width=400, on_change=check_tg_btn, expand=True,
                             tooltip=TG_TOKEN_HELP)
     tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько", width=400, on_change=check_tg_btn,
@@ -254,15 +273,18 @@ def main(page: ft.Page):
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
     proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
-    geo = ft.TextField(label="Ограничение по городу", width=400, on_change=geo_change, expand=True, tooltip=GEO_HELP)
+    geo = ft.TextField(label="Ограничение по городу", width=400, on_change=required_field_for_more_info, expand=True,
+                       tooltip=GEO_HELP)
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
                                  style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
     console_widget = ft.Text(width=800, height=100, color=ft.colors.GREEN, value="", selectable=True,
                              expand=True)  # , bgcolor=ft.colors.GREY_50)
-    need_more_info = ft.Checkbox("Дополнительная информация", on_change=geo_change, tooltip=NEED_MORE_INFO_HELP)
+    need_more_info = ft.Checkbox("Дополнительная информация", on_change=required_field_for_more_info,
+                                 tooltip=NEED_MORE_INFO_HELP)
     debug_mode = ft.Checkbox("Режим отладки", tooltip=DEBUG_MODE_HELP)
-    buy_me_coffe_btn = ft.TextButton("Купить кофе разработчику",
+    fast_speed = ft.Checkbox("Ускорить", tooltip=SKIP_JS_HELP)
+    buy_me_coffe_btn = ft.TextButton("Поддержать развитие парсера",
                                      on_click=lambda e: page.launch_url("https://yoomoney.ru/to/410014382689862"),
                                      style=ft.ButtonStyle(color=ft.colors.GREEN_300), expand=True,
                                      tooltip=BUY_ME_COFFE_BTN_HELP)
@@ -282,12 +304,17 @@ def main(page: ft.Page):
             label_not_required,
 
             ft.Row(
-                [keyword_input, geo],
+                [keyword_input, black_keyword_input],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
             ft.Row(
                 [count_page, pause_sec],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            ft.Row(
+                [geo, max_view],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
@@ -305,7 +332,7 @@ def main(page: ft.Page):
             proxy_btn_help,
             ft.Text(""),
             ft.Row(
-                [need_more_info, debug_mode],
+                [need_more_info, debug_mode, fast_speed],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
@@ -313,7 +340,9 @@ def main(page: ft.Page):
         ],
         expand=True,
         alignment=ft.MainAxisAlignment.CENTER,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        #height=page.window.height // 2
+
     )
 
     controls = ft.Column(
@@ -329,7 +358,15 @@ def main(page: ft.Page):
                           horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def start_page():
-        page.add(all_field, )
+        #page.add(all_field, )
+        page.add(ft.Column(
+            [all_field],
+            expand=True,
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            scroll=ft.ScrollMode.AUTO
+        ))
+
 
     set_up()
     start_page()
