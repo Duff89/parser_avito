@@ -4,8 +4,11 @@ import threading
 import time
 
 import flet as ft
+import yaml
 from loguru import logger
 from notifiers.logging import NotificationHandler
+
+from core.settings import ParserSettings
 
 __VERSION__ = "2.0.2"
 
@@ -23,6 +26,7 @@ def main(page: ft.Page):
     page.window.min_height = 920
     page.padding = 20
     tg_logger_init = False
+    config_pyd = ParserSettings()
     config = configparser.ConfigParser()
     config.read("settings.ini", encoding='utf-8')
     is_run = False
@@ -31,49 +35,41 @@ def main(page: ft.Page):
     def set_up():
         """Работа с настройками"""
         nonlocal config
-        try:
-            """Багфикс возможных проблем с экранированием"""
-            url_input.value = "\n".join(config["Avito"]["URL"].split(","))
-        except Exception as err:
-            logger.debug(f"Ошибка url при открытии конфига: {err}")
-            with open('settings.ini') as file:
-                line_url = file.readlines()[1]
-                regex = r"http.+"
-                all_links = re.findall(regex, line_url)
-                if all_links:
-                    url_input.value = "\n".join(all_links)
-                url_input.value = re.findall(regex, line_url)[0]
-        tg_chat_id.value = "\n".join(config["Avito"]["CHAT_ID"].split(","))
-        tg_token.value = config["Avito"]["TG_TOKEN"]
-        count_page.value = config["Avito"]["NUM_ADS"]
-        pause_sec.value = config["Avito"]["FREQ"]
-        keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
-        max_price.value = config["Avito"].get("MAX_PRICE", "0")
-        min_price.value = config["Avito"].get("MIN_PRICE", "0")
-        geo.value = config["Avito"].get("GEO", "")
-        proxy.value = config["Avito"].get("PROXY", "")
-        proxy_change_ip.value = config["Avito"].get("PROXY_CHANGE_IP", "")
-        need_more_info.value = True if config["Avito"].get("NEED_MORE_INFO", "0") == "1" else False
-        debug_mode.value = True if config["Avito"].get("DEBUG_MODE", "0") == "1" else False
+        tg_chat_id.value = "\n".join(config_pyd.avito.chat_ids)
+        tg_token.value = config_pyd.avito.tg_token
+        count_page.value = config_pyd.avito.num_ads
+        pause_sec.value = config_pyd.avito.freq
+        keyword_input.value = "\n".join(config_pyd.avito.keys)
+        max_price.value = config_pyd.avito.max_price
+        min_price.value = config_pyd.avito.min_price
+        geo.value = config_pyd.avito.geo
+        proxy.value = config_pyd.avito.proxy
+        proxy_change_ip.value = config_pyd.avito.proxy_change_ip
+        need_more_info.value = config_pyd.avito.need_more_info
+        debug_mode.value = config_pyd.avito.debug_mode
         page.update()
 
     def save_config():
         """Сохраняет конфиг"""
-        config["Avito"]["TG_TOKEN"] = tg_token.value
-        config["Avito"]["CHAT_ID"] = ",".join(tg_chat_id.value.split())
-        config["Avito"]["URL"] = ",".join(str(url_input.value).replace('%', '%%').split())  # bugfix
-        config["Avito"]["NUM_ADS"] = count_page.value
-        config["Avito"]["FREQ"] = pause_sec.value
-        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split())
-        config["Avito"]["MAX_PRICE"] = max_price.value
-        config["Avito"]["MIN_PRICE"] = min_price.value
-        config["Avito"]["GEO"] = geo.value
-        config["Avito"]["PROXY"] = proxy.value
-        config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
-        config["Avito"]["NEED_MORE_INFO"] = "1" if need_more_info.value else "0"
-        config["Avito"]["DEBUG_MODE"] = "1" if debug_mode.value else "0"
-        with open('settings.ini', 'w', encoding='utf-8') as configfile:
-            config.write(configfile)
+        config_dump = {
+            "avito": {
+                "tg_token": tg_token.value,
+                "chat_ids": tg_chat_id.value.split(),
+                "url": str(url_input.value).replace('%', '%%').split(),
+                "num_ads": count_page.value,
+                "freq": pause_sec.value,
+                "keys": keyword_input.value.split(),
+                "max_price": max_price.value,
+                "min_price": min_price.value,
+                "geo": geo.value,
+                "proxy": proxy.value,
+                "proxy_change_ip": proxy_change_ip.value,
+                "need_more_info": need_more_info.value,
+                "debug_mode": debug_mode.value,
+            }
+        }
+        with open('settings.yaml', 'w', encoding='utf-8') as configfile:
+            yaml.dump(config_dump, configfile)
         logger.debug("Настройки сохранены")
 
     def check_tg_btn(e):

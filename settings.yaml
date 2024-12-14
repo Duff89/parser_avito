@@ -1,0 +1,14 @@
+avito:
+  chat_ids: []
+  debug_mode: false
+  freq: 60
+  geo: ''
+  keys: []
+  max_price: 20000
+  min_price: 0
+  need_more_info: 0
+  num_ads: 2
+  proxy: ''
+  proxy_change_ip: ''
+  tg_token: ''
+  url: []
