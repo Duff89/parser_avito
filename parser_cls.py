@@ -359,12 +359,13 @@ if __name__ == '__main__':
     while True:
         try:
             AvitoParse(
-                url=config_pyd.avito.url,
+                url=[str(url_) for url_ in config_pyd.avito.url],
                 count=config_pyd.avito.num_ads,
                 keysword_list=config_pyd.avito.keys,
                 max_price=config_pyd.avito.max_price,
                 min_price=config_pyd.avito.min_price,
                 geo=config_pyd.avito.geo,
+                debug_mode=config_pyd.avito.debug_mode,
                 need_more_info=config_pyd.avito.need_more_info,
                 proxy=config_pyd.avito.proxy,
                 proxy_change_url=config_pyd.avito.proxy_change_ip,
