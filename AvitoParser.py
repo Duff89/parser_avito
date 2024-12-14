@@ -35,6 +35,7 @@ def main(page: ft.Page):
     def set_up():
         """Работа с настройками"""
         nonlocal config
+        url_input.value = "\n".join(str(url_) for url_ in config_pyd.avito.url)
         tg_chat_id.value = "\n".join(config_pyd.avito.chat_ids)
         tg_token.value = config_pyd.avito.tg_token
         count_page.value = config_pyd.avito.num_ads
