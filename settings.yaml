@@ -1,14 +1,17 @@
 avito:
+  url: []
   chat_ids: []
+  tg_token: ''
   debug_mode: false
+  fast_speed: false
   freq: 60
   geo: ''
   keys: []
-  max_price: 20000
+  black_keyword_input: []
+  max_price: 200000000
   min_price: 0
-  need_more_info: 0
+  need_more_info: true
   num_ads: 2
   proxy: ''
   proxy_change_ip: ''
-  tg_token: ''
-  url: []
+  max_view: null

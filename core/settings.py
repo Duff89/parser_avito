@@ -22,6 +22,9 @@ class AvitoSettings(BaseModel):
     proxy_change_ip: str = ""
     need_more_info: int = False
     debug_mode: bool = True
+    max_view: int | None = None
+    black_keyword_input: list[str] = Field(default_factory=list)
+    fast_speed: bool = False
 
 
 class ParserSettings(BaseSettings):

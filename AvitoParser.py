@@ -48,10 +48,9 @@ def main(page: ft.Page):
         proxy_change_ip.value = config_pyd.avito.proxy_change_ip
         need_more_info.value = config_pyd.avito.need_more_info
         debug_mode.value = config_pyd.avito.debug_mode
-
-        max_view.value = config["Avito"].get("MAX_VIEW")
-        black_keyword_input.value = "\n".join(config["Avito"].get("KEYS_BLACK", "").split(","))
-        fast_speed.value = True if config["Avito"].get("FAST_SPEED", "0") == "1" else False
+        max_view.value = config_pyd.avito.max_view 
+        black_keyword_input.value = "\n".join(config_pyd.avito.black_keyword_input)
+        fast_speed.value = config_pyd.avito.fast_speed
 
         page.update()
 
@@ -59,16 +58,16 @@ def main(page: ft.Page):
         """Сохраняет конфиг"""
         config_dump = {
             "avito": {
+                "url": str(url_input.value).replace('%', '%%').split(),
                 "tg_token": tg_token.value,
                 "chat_ids": tg_chat_id.value.split(),
-                "url": str(url_input.value).replace('%', '%%').split(),
                 "num_ads": count_page.value,
                 "freq": pause_sec.value,
                 "keys": keyword_input.value.split(),
                 "black_keyword_input": black_keyword_input.value.split(),
                 "max_price": max_price.value,
                 "min_price": min_price.value,
-                "max_view": max_view.value,
+                "max_view": max_view.value or None,
                 "geo": geo.value,
                 "proxy": proxy.value,
                 "proxy_change_ip": proxy_change_ip.value,

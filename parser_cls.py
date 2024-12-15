@@ -322,6 +322,7 @@ if __name__ == '__main__':
                 url=[str(url_) for url_ in config_pyd.avito.url],
                 count=config_pyd.avito.num_ads,
                 keysword_list=config_pyd.avito.keys,
+                keysword_black_list=config_pyd.avito.black_keyword_input,
                 max_price=config_pyd.avito.max_price,
                 min_price=config_pyd.avito.min_price,
                 geo=config_pyd.avito.geo,
@@ -329,10 +330,8 @@ if __name__ == '__main__':
                 need_more_info=config_pyd.avito.need_more_info,
                 proxy=config_pyd.avito.proxy,
                 proxy_change_url=config_pyd.avito.proxy_change_ip,
-
-                keysword_black_list=keys_black if keys_black not in ([''], None) else None,
-                max_views=int(max_view) if max_view else None,
-                fast_speed=1 if fast_speed else 0
+                max_views=config_pyd.avito.max_view,
+                fast_speed=config_pyd.avito.fast_speed,
             ).parse()
             logger.info("Пауза")
             time.sleep(int(config_pyd.avito.freq))
