@@ -26,31 +26,28 @@ def main(page: ft.Page):
     page.window.min_height = 500
     page.padding = 20
     tg_logger_init = False
-    config_pyd = ParserSettings()
-    config = configparser.ConfigParser()
-    config.read("settings.ini", encoding='utf-8')
+    config = ParserSettings()
     is_run = False
     stop_event = threading.Event()
 
     def set_up():
         """Работа с настройками"""
-        nonlocal config
-        url_input.value = "\n".join(str(url_) for url_ in config_pyd.avito.url)
-        tg_chat_id.value = "\n".join(config_pyd.avito.chat_ids)
-        tg_token.value = config_pyd.avito.tg_token
-        count_page.value = config_pyd.avito.num_ads
-        pause_sec.value = config_pyd.avito.freq
-        keyword_input.value = "\n".join(config_pyd.avito.keys)
-        black_keyword_input.value = "\n".join(config_pyd.avito.black_keyword_input)
-        max_price.value = config_pyd.avito.max_price
-        min_price.value = config_pyd.avito.min_price
-        max_view.value = config_pyd.avito.max_view 
-        geo.value = config_pyd.avito.geo
-        proxy.value = config_pyd.avito.proxy
-        proxy_change_ip.value = config_pyd.avito.proxy_change_ip
-        need_more_info.value = config_pyd.avito.need_more_info
-        debug_mode.value = config_pyd.avito.debug_mode
-        fast_speed.value = config_pyd.avito.fast_speed
+        url_input.value = "\n".join(str(url_) for url_ in config.avito.url)
+        tg_chat_id.value = "\n".join(config.avito.chat_ids)
+        tg_token.value = config.avito.tg_token
+        count_page.value = config.avito.num_ads
+        pause_sec.value = config.avito.freq
+        keyword_input.value = "\n".join(config.avito.keys)
+        black_keyword_input.value = "\n".join(config.avito.black_keyword_input)
+        max_price.value = config.avito.max_price
+        min_price.value = config.avito.min_price
+        max_view.value = config.avito.max_view 
+        geo.value = config.avito.geo
+        proxy.value = config.avito.proxy
+        proxy_change_ip.value = config.avito.proxy_change_ip
+        need_more_info.value = config.avito.need_more_info
+        debug_mode.value = config.avito.debug_mode
+        fast_speed.value = config.avito.fast_speed
 
         page.update()
 
