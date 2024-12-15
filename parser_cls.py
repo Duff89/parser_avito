@@ -1,6 +1,7 @@
 import csv
 import os
 import random
+import re
 import threading
 import time
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
@@ -12,7 +13,9 @@ from seleniumbase import SB
 
 from core.settings import ParserSettings
 from custom_exception import StopEventException
+from db_service import SQLiteDBHandler
 from locator import LocatorAvito
+from xlsx_service import XLSXHandler
 
 
 class AvitoParse:
@@ -22,6 +25,7 @@ class AvitoParse:
     def __init__(self,
                  url: list,
                  keysword_list: list,
+                 keysword_black_list: list,
                  count: int = 5,
                  tg_token: str = None,
                  max_price: int = 0,
@@ -32,22 +36,29 @@ class AvitoParse:
                  proxy: str = None,
                  proxy_change_url: str = None,
                  stop_event=None,
+                 max_views: int = None,
+                 fast_speed: int = 0
                  ):
         self.url_list = url
         self.url = None
         self.keys_word = keysword_list or None
+        self.keys_black_word = keysword_black_list or None
         self.count = count
         self.data = []
         self.tg_token = tg_token
         self.title_file = self.__get_file_title()
         self.max_price = int(max_price)
         self.min_price = int(min_price)
+        self.max_views = max_views
         self.geo = geo
         self.debug_mode = debug_mode
         self.need_more_info = need_more_info
         self.proxy = proxy
         self.proxy_change_url = proxy_change_url
         self.stop_event = stop_event or threading.Event()
+        self.db_handler = SQLiteDBHandler()
+        self.xlsx_handler = XLSXHandler(self.title_file)
+        self.fast_speed = fast_speed
 
     @property
     def use_proxy(self) -> bool:
@@ -72,7 +83,6 @@ class AvitoParse:
     def __paginator(self):
         """Кнопка далее"""
         logger.info('Страница успешно загружена. Просматриваю объявления')
-        self.__create_file_csv()
         for i in range(self.count):
             if self.stop_event.is_set():
                 break
@@ -106,16 +116,6 @@ class AvitoParse:
     def __parse_page(self):
         """Парсит открытую страницу"""
         self.check_stop_event()
-        """Ограничение количества просмотренных объявлений"""
-        if os.path.isfile('viewed.txt'):
-            with open('viewed.txt', 'r') as file:
-                self.viewed_list = list(map(str.rstrip, file.readlines()))
-                if len(self.viewed_list) > 5000:
-                    self.viewed_list = self.viewed_list[-900:]
-        else:
-            with open('viewed.txt', 'w'):
-                self.viewed_list = []
-
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
         logger.info(f"Вижу {len(titles)} объявлений на странице")
         data_from_general_page = []
@@ -123,7 +123,11 @@ class AvitoParse:
             """Сбор информации с основной страницы"""
             name = title.find_element(*LocatorAvito.NAME).text
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
-                description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+                try:
+                    description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+                except Exception as err:
+                    logger.debug(f"Ошибка при получении описания: {err}")
+                    description = ''
             else:
                 description = ''
 
@@ -131,18 +135,28 @@ class AvitoParse:
             price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
 
-            if self.is_viewed(ads_id):
+            if self.is_viewed(ads_id, price):
+                logger.debug("Пропускаю")
                 continue
-            self.viewed_list.append(ads_id)
             data = {
                 'name': name,
                 'description': description,
                 'url': url,
-                'price': price
+                'price': price,
+                'id': ads_id
             }
+
+            all_content = description.lower() + name.lower()
             if self.min_price <= int(price) <= self.max_price:
-                if self.keys_word:
-                    if any([item.lower() in (description.lower() + name.lower()) for item in self.keys_word]):
+                if self.keys_word and self.keys_black_word:
+                    if any([item.lower() in all_content for item in self.keys_word])\
+                            and not any([item.lower() in all_content for item in self.keys_black_word]):
+                        data_from_general_page.append(data)
+                elif self.keys_black_word:
+                    if not any([item.lower() in all_content for item in self.keys_black_word]):
+                        data_from_general_page.append(data)
+                elif self.keys_word:
+                    if any([item.lower() in all_content for item in self.keys_word]):
                         data_from_general_page.append(data)
                 else:
                     data_from_general_page.append(data)
@@ -158,9 +172,15 @@ class AvitoParse:
                     break
                 if self.need_more_info:
                     item_info = self.__parse_full_page(item_info)
-                if self.geo and item_info.get("geo"):
+
+                if self.geo and item_info.get("geo"):  # проверка гео
                     if not self.geo.lower() in str(item_info.get("geo")).lower():
                         continue
+
+                if self.max_views and int(self.max_views) <= int(item_info.get("views", 0)):
+                    logger.info("Количество просмотров больше заданного. Пропускаю объявление")
+                    continue
+
                 self.__pretty_log(data=item_info)
                 self.__save_data(data=item_info)
             except Exception as err:
@@ -168,16 +188,17 @@ class AvitoParse:
 
     @staticmethod
     def __pretty_log(data):
-        """Красивый вывод"""
-        logger.success(
-            f'\n{data.get("name", "-")}\n'
-            f'Цена: {data.get("price", "-")}\n'
-            f'Описание: {data.get("description", "-")}\n'
-            f'Просмотров: {data.get("views", "-")}\n'
-            f'Дата публикации: {data.get("date_public", "-")}\n'
-            f'Продавец: {data.get("seller_name", "-")}\n'
-            f'Адрес: {data.get("geo", "-")}\n'
-            f'Ссылка: {data.get("url", "-")}\n')
+        """Красивый вывод для Telegram"""
+        price = data.get("price", "-")
+        name = data.get("name", "-")
+        id_ = data.get("id", "-")
+        seller_name = data.get("seller_name")
+        short_url = f"https://avito.ru/{id_}"
+        message = (
+                f"{price}\n{name}\n{short_url}\n"
+                + (f"Продавец: {seller_name}\n" if seller_name else "")
+        )
+        logger.success(message)
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
@@ -199,7 +220,7 @@ class AvitoParse:
             return data
 
         """Гео"""
-        if self.geo and self.driver.find_elements(LocatorAvito.GEO[1], by="css selector"):
+        if self.driver.find_elements(LocatorAvito.GEO[1], by="css selector"):
             geo = self.driver.find_element(LocatorAvito.GEO[1], by="css selector").text
             data["geo"] = geo.lower()
 
@@ -222,64 +243,16 @@ class AvitoParse:
 
         return data
 
-    def is_viewed(self, ads_id: str) -> bool:
+    def is_viewed(self, ads_id: int, price: int) -> bool:
         """Проверяет, смотрели мы это или нет"""
-        if ads_id in self.viewed_list:
-            return True
-        return False
+        return self.db_handler.record_exists(ads_id, price)
 
-    def __save_data(self, data: dict):
-        """Сохраняет результат в файл keyword*.csv"""
-        with open(f"result/{self.title_file}.csv", mode="a", newline='', encoding='utf-8', errors='ignore') as file:
-            writer = csv.writer(file)
-            writer.writerow([
-                data.get("name", '-'),
-                data.get("price", '-'),
-                data.get("url", '-'),
-                data.get("description", '-'),
-                data.get("views", '-'),
-                data.get("date_public", '-'),
-                data.get("seller_name", 'no'),
-                data.get("geo", '-')
-            ])
+    def __save_data(self, data: dict) -> None:
+        """Сохраняет результат в файл keyword*.xlsx"""
+        self.xlsx_handler.append_data(data=data)
 
         """сохраняет просмотренные объявления"""
-        with open('viewed.txt', 'w') as file:
-            for item in set(self.viewed_list):
-                file.write("%s\n" % item)
-
-    @property
-    def __is_csv_empty(self) -> bool:
-        """Пустой csv или нет"""
-        os.makedirs(os.path.dirname("result/"), exist_ok=True)
-        try:
-            with open(f"result/{self.title_file}.csv", 'r', encoding='utf-8', errors='ignore') as file:
-                reader = csv.reader(file)
-                try:
-                    first_row = next(reader)
-                except StopIteration:
-                    return True
-                return False
-        except FileNotFoundError:
-            return True
-
-    @logger.catch
-    def __create_file_csv(self):
-        """Создает файл и прописывает названия если нужно"""
-
-        if self.__is_csv_empty:
-            with open(f"result/{self.title_file}.csv", 'a', encoding='utf-8', errors='ignore') as file:
-                writer = csv.writer(file)
-                writer.writerow([
-                    "Название",
-                    "Цена",
-                    "Ссылка",
-                    "Описание",
-                    "Просмотров",
-                    "Дата публикации",
-                    "Продавец",
-                    "Адрес"
-                ])
+        self.db_handler.add_record(record_id=int(data.get("id")), price=int(data.get("price")))
 
     def __get_file_title(self) -> str:
         """Определяет название файла"""
@@ -287,7 +260,7 @@ class AvitoParse:
             title_file = "-".join(list(map(str.lower, self.keys_word)))
         else:
             title_file = 'all'
-        return title_file
+        return f"result/{title_file}.xlsx"
 
     def parse(self):
         """Метод для вызова"""
@@ -302,7 +275,8 @@ class AvitoParse:
                     page_load_strategy="eager",
                     block_images=True,
                     agent=random.choice(open("user_agent_pc.txt").readlines()),
-                    proxy=self.proxy
+                    proxy=self.proxy,
+                    sjw=True if self.fast_speed else False,
                     ) as self.driver:
                 try:
                     self.__get_url()
@@ -324,25 +298,11 @@ class AvitoParse:
         logger.info("Меняю IP")
         res = requests.get(url=self.proxy_change_url)
         if res.status_code == 200:
-            logger.info("Запрос на смену IP отправлен. Жду изменения")
-        proxies = {
-            'https': f"http://{self.proxy}"
-        }
-        for i in range(10):
-            self.check_stop_event()
-            time.sleep(5)
-            try:
-                response = requests.get(
-                    url="https://api.ipify.org?format=json",
-                    proxies=proxies)
-                if ip := response.json().get("ip"):
-                    logger.info(f"Новый IP {ip}")
-                    self.driver.delete_all_cookies()
-                    return True
-            except Exception as err:
-                logger.debug(err)
-                time.sleep(5)
-        return False
+            logger.info("IP изменен")
+            return True
+        logger.info("Не удалось изменить IP, пробую еще раз")
+        time.sleep(10)
+        return self.change_ip()
 
 
 if __name__ == '__main__':
@@ -369,6 +329,10 @@ if __name__ == '__main__':
                 need_more_info=config_pyd.avito.need_more_info,
                 proxy=config_pyd.avito.proxy,
                 proxy_change_url=config_pyd.avito.proxy_change_ip,
+
+                keysword_black_list=keys_black if keys_black not in ([''], None) else None,
+                max_views=int(max_view) if max_view else None,
+                fast_speed=1 if fast_speed else 0
             ).parse()
             logger.info("Пауза")
             time.sleep(int(config_pyd.avito.freq))

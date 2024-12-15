@@ -6,3 +6,4 @@ requests==2.32.3
 seleniumbase
 pydantic>=2.10.3
 pydantic-settings>=2.7.0
+openpyxl
