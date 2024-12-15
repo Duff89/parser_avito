@@ -334,7 +334,7 @@ if __name__ == '__main__':
                 fast_speed=config_pyd.avito.fast_speed,
             ).parse()
             logger.info("Пауза")
-            time.sleep(int(config_pyd.avito.freq))
+            time.sleep(config_pyd.avito.freq)
         except Exception as error:
             logger.error(error)
             logger.error(
