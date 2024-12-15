@@ -171,3 +171,4 @@ cython_debug/
 viewed.txt
 downloaded_files/
 result/
+database.db
