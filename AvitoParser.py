@@ -41,15 +41,15 @@ def main(page: ft.Page):
         count_page.value = config_pyd.avito.num_ads
         pause_sec.value = config_pyd.avito.freq
         keyword_input.value = "\n".join(config_pyd.avito.keys)
+        black_keyword_input.value = "\n".join(config_pyd.avito.black_keyword_input)
         max_price.value = config_pyd.avito.max_price
         min_price.value = config_pyd.avito.min_price
+        max_view.value = config_pyd.avito.max_view 
         geo.value = config_pyd.avito.geo
         proxy.value = config_pyd.avito.proxy
         proxy_change_ip.value = config_pyd.avito.proxy_change_ip
         need_more_info.value = config_pyd.avito.need_more_info
         debug_mode.value = config_pyd.avito.debug_mode
-        max_view.value = config_pyd.avito.max_view 
-        black_keyword_input.value = "\n".join(config_pyd.avito.black_keyword_input)
         fast_speed.value = config_pyd.avito.fast_speed
 
         page.update()
