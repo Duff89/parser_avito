@@ -7,7 +7,7 @@ import flet as ft
 from loguru import logger
 from notifiers.logging import NotificationHandler
 
-__VERSION__ = "2.0.5"
+__VERSION__ = "2.1.0"
 
 from lang import *
 from parser_cls import AvitoParse
@@ -50,7 +50,7 @@ def main(page: ft.Page):
         max_view.value = config["Avito"].get("MAX_VIEW")
         keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
         black_keyword_input.value = "\n".join(config["Avito"].get("KEYS_BLACK", "").split(","))
-        max_price.value = config["Avito"].get("MAX_PRICE", "0")
+        max_price.value = config["Avito"].get("MAX_PRICE")
         min_price.value = config["Avito"].get("MIN_PRICE", "0")
         geo.value = config["Avito"].get("GEO", "")
         proxy.value = config["Avito"].get("PROXY", "")

@@ -174,7 +174,7 @@ class AvitoParse:
                     if not self.geo.lower() in str(item_info.get("geo")).lower():
                         continue
 
-                if self.max_views and self.max_views >= int(item_info.get("views", 0)):
+                if self.max_views and int(self.max_views) <= int(item_info.get("views", 0)):
                     logger.info("Количество просмотров больше заданного. Пропускаю объявление")
                     continue
 
@@ -217,7 +217,7 @@ class AvitoParse:
             return data
 
         """Гео"""
-        if self.geo and self.driver.find_elements(LocatorAvito.GEO[1], by="css selector"):
+        if self.driver.find_elements(LocatorAvito.GEO[1], by="css selector"):
             geo = self.driver.find_element(LocatorAvito.GEO[1], by="css selector").text
             data["geo"] = geo.lower()
 
@@ -244,7 +244,7 @@ class AvitoParse:
         """Проверяет, смотрели мы это или нет"""
         return self.db_handler.record_exists(ads_id, price)
 
-    def __save_data(self, data: dict):
+    def __save_data(self, data: dict) -> None:
         """Сохраняет результат в файл keyword*.xlsx"""
         self.xlsx_handler.append_data(data=data)
 

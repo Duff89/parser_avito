@@ -17,6 +17,7 @@ class XLSXHandler:
 
     def _initialize(self, file_name):
         self.file_name = file_name
+        os.makedirs("result", exist_ok=True)
         if not os.path.exists(self.file_name):
             self._create_file()
 
