@@ -1,4 +1,5 @@
 import random
+import sys
 import threading
 import time
 import re
@@ -367,3 +368,6 @@ if __name__ == '__main__':
                          'Если ошибка повторится несколько раз - перезапустите скрипт.'
                          'Если и это не поможет - значит что-то сломалось')
             time.sleep(30)
+        except KeyboardInterrupt:
+            logger.info('Выход по требованию пользователя')
+            sys.exit(0)        

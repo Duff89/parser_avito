@@ -1,2 +1,8 @@
 # created by virtualenv automatically
-*
+venv/*
+result/*
+
+database.db
+downloaded_files/*
+__pycache__/*
+
