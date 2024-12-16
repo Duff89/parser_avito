@@ -4,8 +4,11 @@ import threading
 import time
 
 import flet as ft
+import yaml
 from loguru import logger
 from notifiers.logging import NotificationHandler
+
+from core.settings import ParserSettings
 
 __VERSION__ = "2.1.0"
 
@@ -23,63 +26,55 @@ def main(page: ft.Page):
     page.window.min_height = 500
     page.padding = 20
     tg_logger_init = False
-    config = configparser.ConfigParser()
-    config.read("settings.ini", encoding='utf-8')
+    config = ParserSettings()
     is_run = False
     stop_event = threading.Event()
 
     def set_up():
         """Работа с настройками"""
-        nonlocal config
-        try:
-            """Багфикс возможных проблем с экранированием"""
-            url_input.value = "\n".join(config["Avito"]["URL"].split(","))
-        except Exception as err:
-            logger.debug(f"Ошибка url при открытии конфига: {err}")
-            with open('settings.ini') as file:
-                line_url = file.readlines()[1]
-                regex = r"http.+"
-                all_links = re.findall(regex, line_url)
-                if all_links:
-                    url_input.value = "\n".join(all_links)
-                url_input.value = re.findall(regex, line_url)[0]
-        tg_chat_id.value = "\n".join(config["Avito"]["CHAT_ID"].split(","))
-        tg_token.value = config["Avito"]["TG_TOKEN"]
-        count_page.value = config["Avito"]["NUM_ADS"]
-        pause_sec.value = config["Avito"]["FREQ"]
-        max_view.value = config["Avito"].get("MAX_VIEW")
-        keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
-        black_keyword_input.value = "\n".join(config["Avito"].get("KEYS_BLACK", "").split(","))
-        max_price.value = config["Avito"].get("MAX_PRICE")
-        min_price.value = config["Avito"].get("MIN_PRICE", "0")
-        geo.value = config["Avito"].get("GEO", "")
-        proxy.value = config["Avito"].get("PROXY", "")
-        proxy_change_ip.value = config["Avito"].get("PROXY_CHANGE_IP", "")
-        need_more_info.value = True if config["Avito"].get("NEED_MORE_INFO", "0") == "1" else False
-        debug_mode.value = True if config["Avito"].get("DEBUG_MODE", "0") == "1" else False
-        fast_speed.value = True if config["Avito"].get("FAST_SPEED", "0") == "1" else False
+        url_input.value = "\n".join(str(url_) for url_ in config.avito.url)
+        tg_chat_id.value = "\n".join(config.avito.chat_ids)
+        tg_token.value = config.avito.tg_token
+        count_page.value = config.avito.num_ads
+        pause_sec.value = config.avito.freq
+        keyword_input.value = "\n".join(config.avito.keys)
+        black_keyword_input.value = "\n".join(config.avito.black_keyword_input)
+        max_price.value = config.avito.max_price
+        min_price.value = config.avito.min_price
+        max_view.value = config.avito.max_view 
+        geo.value = config.avito.geo
+        proxy.value = config.avito.proxy
+        proxy_change_ip.value = config.avito.proxy_change_ip
+        need_more_info.value = config.avito.need_more_info
+        debug_mode.value = config.avito.debug_mode
+        fast_speed.value = config.avito.fast_speed
+
         page.update()
 
     def save_config():
         """Сохраняет конфиг"""
-        config["Avito"]["TG_TOKEN"] = tg_token.value
-        config["Avito"]["CHAT_ID"] = ",".join(tg_chat_id.value.split())
-        config["Avito"]["URL"] = ",".join(str(url_input.value).replace('%', '%%').split())  # bugfix
-        config["Avito"]["NUM_ADS"] = count_page.value
-        config["Avito"]["FREQ"] = pause_sec.value
-        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split())
-        config["Avito"]["KEYS_BLACK"] = ",".join(black_keyword_input.value.split())
-        config["Avito"]["MAX_PRICE"] = max_price.value
-        config["Avito"]["MIN_PRICE"] = min_price.value
-        config["Avito"]["MAX_VIEW"] = min_price.value
-        config["Avito"]["GEO"] = geo.value
-        config["Avito"]["PROXY"] = proxy.value
-        config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
-        config["Avito"]["NEED_MORE_INFO"] = "1" if need_more_info.value else "0"
-        config["Avito"]["DEBUG_MODE"] = "1" if debug_mode.value else "0"
-        config["Avito"]["FAST_SPEED"] = "1" if fast_speed.value else "0"
-        with open('settings.ini', 'w', encoding='utf-8') as configfile:
-            config.write(configfile)
+        config_dump = {
+            "avito": {
+                "url": str(url_input.value).replace('%', '%%').split(),
+                "tg_token": tg_token.value,
+                "chat_ids": tg_chat_id.value.split(),
+                "num_ads": count_page.value,
+                "freq": pause_sec.value,
+                "keys": keyword_input.value.split(),
+                "black_keyword_input": black_keyword_input.value.split(),
+                "max_price": max_price.value,
+                "min_price": min_price.value,
+                "max_view": max_view.value or None,
+                "geo": geo.value,
+                "proxy": proxy.value,
+                "proxy_change_ip": proxy_change_ip.value,
+                "need_more_info": need_more_info.value or False,
+                "debug_mode": debug_mode.value or False,
+                "fast_speed": fast_speed.value or False,
+            }
+        }
+        with open('settings.yaml', 'w', encoding='utf-8') as configfile:
+            yaml.dump(config_dump, configfile)
         logger.debug("Настройки сохранены")
 
     def check_tg_btn(e):

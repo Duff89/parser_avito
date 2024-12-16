@@ -1,14 +1,17 @@
+import csv
+import os
 import random
+import re
 import threading
 import time
-import re
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
+from loguru import logger
 from notifiers.logging import NotificationHandler
 from seleniumbase import SB
-from loguru import logger
 
+from core.settings import ParserSettings
 from custom_exception import StopEventException
 from db_service import SQLiteDBHandler
 from locator import LocatorAvito
@@ -303,41 +306,11 @@ class AvitoParse:
 
 
 if __name__ == '__main__':
-    import configparser
+    config_pyd = ParserSettings()
 
-    config = configparser.ConfigParser()
-    config.read("settings.ini", encoding="utf-8")
-
-    try:
-        """Багфикс проблем с экранированием"""
-        url = config["Avito"]["URL"].split(",")
-    except Exception:
-        with open('settings.ini', encoding="utf-8") as file:
-            line_url = file.readlines()[1]
-            regex = r"http.+"
-            url = re.findall(regex, line_url)
-
-    chat_ids = config["Avito"]["CHAT_ID"].split(",")
-    token = config["Avito"]["TG_TOKEN"]
-    num_ads = config["Avito"]["NUM_ADS"]
-    max_view = config["Avito"].get("MAX_VIEW")
-    freq = config["Avito"]["FREQ"]
-    keys = config["Avito"]["KEYS"].split(",")
-    keys_black = config["Avito"].get("KEYS_BLACK", "").split(",")
-    max_price = config["Avito"].get("MAX_PRICE", "9999999999") or "9999999999"
-    min_price = config["Avito"].get("MIN_PRICE", "0") or "0"
-    geo = config["Avito"].get("GEO", "") or ""
-    proxy = config["Avito"].get("PROXY", "")
-    proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
-    need_more_info = int(config["Avito"]["NEED_MORE_INFO"])
-    fast_speed = int(config["Avito"]["NEED_MORE_INFO"])
-
-    if token and chat_ids:
-        for chat_id in chat_ids:
-            params = {
-                'token': token,
-                'chat_id': chat_id
-            }
+    if config_pyd.avito.tg_token and config_pyd.avito.chat_ids:
+        for chat_id in config_pyd.avito.chat_ids:
+            params = {"token": config_pyd.avito.tg_token, "chat_id": chat_id}
             tg_handler = NotificationHandler("telegram", defaults=params)
 
             """Все логи уровня SUCCESS и выше отсылаются в телегу"""
@@ -346,24 +319,27 @@ if __name__ == '__main__':
     while True:
         try:
             AvitoParse(
-                url=url,
-                count=int(num_ads),
-                keysword_list=keys if keys not in ([''], None) else None,
-                keysword_black_list=keys_black if keys_black not in ([''], None) else None,
-                max_price=int(max_price),
-                min_price=int(min_price),
-                geo=geo,
-                need_more_info=1 if need_more_info else 0,
-                proxy=proxy,
-                proxy_change_url=proxy_change_ip,
-                max_views=int(max_view) if max_view else None,
-                fast_speed=1 if fast_speed else 0
+                url=[str(url_) for url_ in config_pyd.avito.url],
+                count=config_pyd.avito.num_ads,
+                keysword_list=config_pyd.avito.keys,
+                keysword_black_list=config_pyd.avito.black_keyword_input,
+                max_price=config_pyd.avito.max_price,
+                min_price=config_pyd.avito.min_price,
+                geo=config_pyd.avito.geo,
+                debug_mode=config_pyd.avito.debug_mode,
+                need_more_info=config_pyd.avito.need_more_info,
+                proxy=config_pyd.avito.proxy,
+                proxy_change_url=config_pyd.avito.proxy_change_ip,
+                max_views=config_pyd.avito.max_view,
+                fast_speed=config_pyd.avito.fast_speed,
             ).parse()
             logger.info("Пауза")
-            time.sleep(int(freq))
+            time.sleep(config_pyd.avito.freq)
         except Exception as error:
             logger.error(error)
-            logger.error('Произошла ошибка, но работа будет продолжена через 30 сек. '
-                         'Если ошибка повторится несколько раз - перезапустите скрипт.'
-                         'Если и это не поможет - значит что-то сломалось')
+            logger.error(
+                "Произошла ошибка, но работа будет продолжена через 30 сек. "
+                "Если ошибка повторится несколько раз - перезапустите скрипт."
+                "Если и это не поможет - обратитесь к разработчику по ссылке ниже"
+            )
             time.sleep(30)
