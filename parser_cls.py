@@ -370,4 +370,4 @@ if __name__ == '__main__':
             time.sleep(30)
         except KeyboardInterrupt:
             logger.info('Выход по требованию пользователя')
-            sys.exit(0)        
+            sys.exit(0)    
