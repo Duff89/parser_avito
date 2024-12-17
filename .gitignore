@@ -1,8 +1,9 @@
 # created by virtualenv automatically
 venv/*
 result/*
-
+settings.ini
 database.db
 downloaded_files/*
 __pycache__/*
 
+settings.ini

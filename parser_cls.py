@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import random
 import sys
 import threading
@@ -191,12 +192,56 @@ class AvitoParse:
         name = data.get("name", "-")
         id_ = data.get("id", "-")
         seller_name = data.get("seller_name")
+        public_date = data.get("date_public")
         short_url = f"https://avito.ru/{id_}"
         message = (
                 f"{price}\n{name}\n{short_url}\n"
                 + (f"Продавец: {seller_name}\n" if seller_name else "")
+                + (f"Дата: {public_date}\n" if public_date else "")
         )
         logger.success(message)
+
+    @staticmethod
+    def __datepublic_to_datestamp(date_of_public: str)->str:
+        """преобразует формат авито в понятный для Excel формат.
+        Args:
+            date_of_public (str): date with two diff format
+        Returns:
+            str: отображение вида: 08.12 11:20
+        """
+        months = {
+                    'января': '01',
+                    'февраля': '02',
+                    'марта': '03',
+                    'апреля': '04',
+                    'мая': '05',
+                    'июня': '06',
+                    'июля': '07',
+                    'августа': '08',
+                    'сентября': '09',
+                    'октября': '10',
+                    'ноября': '11',
+                    'декабря': '12',                    
+                }
+        match  (date_of_public.split(' ')):
+            case public_day, public_month, public_time:
+                choisen_month = months.get(public_month) or '_'
+                # здесь формат "9 ноября в 16:25"        
+                return  (f'{public_day.zfill(2)}.{choisen_month} '
+                         f'{public_time}')
+            # здесь формат  'вчера в 11:19'
+            case 'вчера', public_time:    
+                yerstaday_date = datetime.now()-timedelta(days=1)
+                return (f'{yerstaday_date.day:02}.{yerstaday_date.month:02} '
+                        f'{public_time}')
+            case 'сегодня', public_time:
+                return (f'{datetime.now().day:02}.{datetime.now().month:02} '
+                        f'{public_time}')
+            case _:
+                logger.warning('Формат даты со страницы неверный - %s', 
+                               date_of_public)
+                return date_of_public
+
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
@@ -230,9 +275,8 @@ class AvitoParse:
         """Дата публикации"""
         if self.driver.find_elements(LocatorAvito.DATE_PUBLIC[1], by="css selector"):
             date_public = self.driver.find_element(LocatorAvito.DATE_PUBLIC[1], by="css selector").text
-            if "· " in date_public:
-                date_public = date_public.replace("· ", '')
-            data["date_public"] = date_public
+            date_public = date_public.replace("· ", '').replace(' в ', ' ')
+            data["date_public"] = self.__datepublic_to_datestamp(date_public)
 
         """Имя продавца"""
         if self.driver.find_elements(LocatorAvito.SELLER_NAME[1], by="css selector"):
