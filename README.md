@@ -76,7 +76,8 @@
   sudo docker build -t avito_parser:v0.1 .
 ```
 ```bash
-  sudo docker run -it avito_parser:v0.1 avito
+sudo docker run -it -e URL_AVITO="https://www.avito.ru/all?q=kawasaki+1000sx https://www.avito.ru/all?q=kawasaki+ninja+1000" -e TG_TOKEN="XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" -e CHAT_ID_TG="-XXXXXXXXXX" -e FAST_SPEED_AVITO=250 -e MAX_VIEW_AVITO=4 -e MIN_PRICE_AVITO=700000 -e KEYS_AVITO="" --mount type=bind,source=/home/alex/AvitoDataKava,destination=/parse_avito/result avito_parser:v0.1 avito
+
 ```
 
 
