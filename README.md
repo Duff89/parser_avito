@@ -73,6 +73,16 @@
 - При нажатии на кнопку Test в скрипте, Вам должно прийти сообщение. Если нет, перезагрузите скрипт и попробуйте еще раз
 
 
+### Docker
+```bash
+  sudo docker build -t avito_parser:v0.1 .
+```
+```bash
+sudo docker run -it -e URL_AVITO="https://www.avito.ru/all?q=kawasaki+1000sx https://www.avito.ru/all?q=kawasaki+ninja+1000" -e TG_TOKEN="XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" -e CHAT_ID_TG="-XXXXXXXXXX" -e FAST_SPEED_AVITO=250 -e MAX_VIEW_AVITO=4 -e MIN_PRICE_AVITO=700000 -e KEYS_AVITO="" --mount type=bind,source=/home/alex/AvitoDataKava,destination=/parse_avito/result avito_parser:v0.1 avito
+
+```
+
+
 ### Проблемы
 
 При обнаружении ошибок, пишите в https://github.com/Duff89/parser_avito/issues.
@@ -86,4 +96,3 @@
 Ваша поддержка очень важна для дальнейшего и регулярного развития данного скрипта.
 Поддержать можно по ссылке: https://yoomoney.ru/to/410014382689862
 или простым переводом 2204 1201 0103 5539. Заранее спасибо
-
