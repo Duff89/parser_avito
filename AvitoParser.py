@@ -7,18 +7,18 @@ import flet as ft
 from loguru import logger
 from notifiers.logging import NotificationHandler
 
-__VERSION__ = "2.1.0"
 
 from lang import *
 from parser_cls import AvitoParse
+from version import VERSION
 
 
 def main(page: ft.Page):
-    page.title = f'Parser Avito v {__VERSION__}'
+    page.title = f'Parser Avito v {VERSION}'
     page.theme_mode = ft.ThemeMode.DARK
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.window.width = 1000
-    page.window.height = 920
+    page.window.height = 950
     page.window.min_width = 650
     page.window.min_height = 500
     page.padding = 20
@@ -67,11 +67,11 @@ def main(page: ft.Page):
         config["Avito"]["URL"] = ",".join(str(url_input.value).replace('%', '%%').split())  # bugfix
         config["Avito"]["NUM_ADS"] = count_page.value
         config["Avito"]["FREQ"] = pause_sec.value
-        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split())
-        config["Avito"]["KEYS_BLACK"] = ",".join(black_keyword_input.value.split())
+        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split("\n"))
+        config["Avito"]["KEYS_BLACK"] = ",".join(black_keyword_input.value.split("\n"))
         config["Avito"]["MAX_PRICE"] = max_price.value
         config["Avito"]["MIN_PRICE"] = min_price.value
-        config["Avito"]["MAX_VIEW"] = min_price.value
+        config["Avito"]["MAX_VIEW"] = max_view.value
         config["Avito"]["GEO"] = geo.value
         config["Avito"]["PROXY"] = proxy.value
         config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
@@ -182,6 +182,9 @@ def main(page: ft.Page):
                 time.sleep(1)
                 if not is_run:
                     logger.info("Завершено")
+                    start_btn.text = "Старт"
+                    start_btn.disabled = False
+                    page.update()
                     return
 
     def stop_parser(e):
@@ -198,7 +201,7 @@ def main(page: ft.Page):
         page.update()
 
     def required_field_for_more_info(e):
-        if geo.value or max_view.value:
+        if geo.value or (max_view.value and max_view.value != "0"):
             need_more_info.value = True
         page.update()
 
@@ -208,8 +211,8 @@ def main(page: ft.Page):
             stop_event=stop_event,
             url=url_input.value.split(),
             count=int(count_page.value),
-            keysword_list=keyword_input.value.split(),
-            keysword_black_list=black_keyword_input.value.split(),
+            keysword_list=keyword_input.value.split("\n") if keyword_input.value else None,
+            keysword_black_list=black_keyword_input.value.split("\n") if black_keyword_input.value else None,
             max_price=int(max_price.value),
             min_price=int(min_price.value),
             geo=geo.value,
@@ -217,7 +220,8 @@ def main(page: ft.Page):
             proxy_change_url=proxy_change_ip.value,
             debug_mode=debug_mode.value,
             need_more_info=need_more_info.value,
-            fast_speed=fast_speed.value
+            fast_speed=fast_speed.value,
+            max_views=max_view.value if max_view.value and max_view.value != "0" else None
         )
         parsing_thread = threading.Thread(target=parser.parse)
         parsing_thread.start()
@@ -284,7 +288,7 @@ def main(page: ft.Page):
                                  tooltip=NEED_MORE_INFO_HELP)
     debug_mode = ft.Checkbox("Режим отладки", tooltip=DEBUG_MODE_HELP)
     fast_speed = ft.Checkbox("Ускорить", tooltip=SKIP_JS_HELP)
-    buy_me_coffe_btn = ft.TextButton("Поддержать развитие парсера",
+    buy_me_coffe_btn = ft.TextButton("Донат автору на пиво",
                                      on_click=lambda e: page.launch_url("https://yoomoney.ru/to/410014382689862"),
                                      style=ft.ButtonStyle(color=ft.colors.GREEN_300), expand=True,
                                      tooltip=BUY_ME_COFFE_BTN_HELP)
@@ -341,7 +345,6 @@ def main(page: ft.Page):
         expand=True,
         alignment=ft.MainAxisAlignment.CENTER,
         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        #height=page.window.height // 2
 
     )
 
@@ -358,7 +361,6 @@ def main(page: ft.Page):
                           horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def start_page():
-        #page.add(all_field, )
         page.add(ft.Column(
             [all_field],
             expand=True,
@@ -366,7 +368,6 @@ def main(page: ft.Page):
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             scroll=ft.ScrollMode.AUTO
         ))
-
 
     set_up()
     start_page()

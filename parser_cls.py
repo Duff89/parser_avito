@@ -46,7 +46,7 @@ class AvitoParse:
         self.title_file = self.__get_file_title()
         self.max_price = int(max_price)
         self.min_price = int(min_price)
-        self.max_views = max_views
+        self.max_views = max_views if max_views and max_views != 0 else None
         self.geo = geo
         self.debug_mode = debug_mode
         self.need_more_info = need_more_info
@@ -83,7 +83,10 @@ class AvitoParse:
         for i in range(self.count):
             if self.stop_event.is_set():
                 break
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            try:
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            except Exception:
+                pass
             time.sleep(1)
             self.__parse_page()
             time.sleep(random.randint(2, 4))
@@ -114,11 +117,15 @@ class AvitoParse:
         """Парсит открытую страницу"""
         self.check_stop_event()
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
-        logger.info(f"Вижу {len(titles)} объявлений на странице")
+        logger.info(f"Вижу объявления на странице")
         data_from_general_page = []
         for title in titles:
             """Сбор информации с основной страницы"""
-            name = title.find_element(*LocatorAvito.NAME).text
+            try:
+                name = title.find_element(*LocatorAvito.NAME).text
+            except Exception:  # иногда это не объявление
+                continue
+
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
                 try:
                     description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
@@ -132,8 +139,20 @@ class AvitoParse:
             price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
 
+            if url and not ads_id:
+                try:
+                    regex = r"_\d+$"
+                    ids = re.findall(pattern=regex, string=url)
+                    if ids:
+                        ads_id = url[-1][:-1]
+                    continue
+                except Exception:
+                    continue
+
+            if not ads_id: continue
+
             if self.is_viewed(ads_id, price):
-                logger.debug("Пропускаю")
+                logger.debug("Пропускаю объявление. Уже видел его")
                 continue
             data = {
                 'name': name,
@@ -142,7 +161,6 @@ class AvitoParse:
                 'price': price,
                 'id': ads_id
             }
-
             all_content = description.lower() + name.lower()
             if self.min_price <= int(price) <= self.max_price:
                 if self.keys_word and self.keys_black_word:
@@ -174,9 +192,10 @@ class AvitoParse:
                     if not self.geo.lower() in str(item_info.get("geo")).lower():
                         continue
 
-                if self.max_views and int(self.max_views) <= int(item_info.get("views", 0)):
-                    logger.info("Количество просмотров больше заданного. Пропускаю объявление")
-                    continue
+                if self.max_views and self.max_views != "0":
+                    if int(self.max_views) <= int(item_info.get("views", 0)):
+                        logger.info("Количество просмотров больше заданного. Пропускаю объявление")
+                        continue
 
                 self.__pretty_log(data=item_info)
                 self.__save_data(data=item_info)
@@ -268,7 +287,7 @@ class AvitoParse:
                 return
             with SB(uc=True,
                     headed=True if self.debug_mode else False,
-                    headless=True if not self.debug_mode else False,
+                    headless2=True if not self.debug_mode else False,
                     page_load_strategy="eager",
                     block_images=True,
                     agent=random.choice(open("user_agent_pc.txt").readlines()),
@@ -362,8 +381,8 @@ if __name__ == '__main__':
             logger.info("Пауза")
             time.sleep(int(freq))
         except Exception as error:
-            logger.error(error)
-            logger.error('Произошла ошибка, но работа будет продолжена через 30 сек. '
+            logger.debug(error)
+            logger.debug('Произошла ошибка, но работа будет продолжена через 30 сек. '
                          'Если ошибка повторится несколько раз - перезапустите скрипт.'
                          'Если и это не поможет - значит что-то сломалось')
             time.sleep(30)
