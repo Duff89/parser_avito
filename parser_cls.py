@@ -128,7 +128,7 @@ class AvitoParse:
 
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
                 try:
-                    description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
+                    description = title.find_element(*LocatorAvito.DESCRIPTIONS).get_attribute("content")
                 except Exception as err:
                     logger.debug(f"Ошибка при получении описания: {err}")
                     description = ''
