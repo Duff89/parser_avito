@@ -96,7 +96,7 @@ class AvitoParse:
     def open_next_btn(self):
         self.url = self.get_next_page_url(url=self.url)
         logger.info("Следующая страница")
-        self.driver.uc_open(self.url)
+        self.driver.open(self.url)
 
     @staticmethod
     def get_next_page_url(url: str):
@@ -117,7 +117,8 @@ class AvitoParse:
         """Парсит открытую страницу"""
         self.check_stop_event()
         titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
-        logger.info(f"Вижу объявления на странице")
+        if titles:
+            logger.info(f"Вижу что-то похожее на  объявления")
         data_from_general_page = []
         for title in titles:
             """Сбор информации с основной страницы"""
@@ -218,7 +219,7 @@ class AvitoParse:
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
-        self.driver.uc_open(data.get("url"))
+        self.driver.open(data.get("url"))
         if "Доступ ограничен" in self.driver.get_title():
             logger.info("Доступ ограничен: проблема с IP")
             self.ip_block()
@@ -285,7 +286,7 @@ class AvitoParse:
             if self.stop_event and self.stop_event.is_set():
                 logger.info("Процесс будет остановлен")
                 return
-            with SB(uc=True,
+            with SB(uc=False,
                     headed=True if self.debug_mode else False,
                     headless2=True if not self.debug_mode else False,
                     page_load_strategy="eager",
