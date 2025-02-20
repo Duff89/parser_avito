@@ -1,6 +1,6 @@
 #!/bin/sh
 sed -i "s|url = .*|url = $URL_AVITO|1" settings.ini
-sed -i "s|chat_id = .*|chat_id= $CHAT_ID_TG|1" settings.ini
+sed -i "s|chat_id = .*|chat_id = $CHAT_ID_TG|1" settings.ini
 sed -i "s|tg_token = .*|tg_token = $TG_TOKEN|1" settings.ini
 sed -i "s|num_ads = .*|num_ads = $NUM_ADS_AVITO|1" settings.ini
 sed -i "s|freq = .*|freq = $FREQ_AVITO|1" settings.ini
