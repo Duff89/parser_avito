@@ -70,6 +70,9 @@ class AvitoParse:
             time.sleep(random.randint(300, 350))
 
     def __get_url(self):
+        if "&s=" not in self.url:
+            self.url += "s=104"
+
         logger.info(f"Открываю страницу: {self.url}")
         self.driver.open(self.url)
 
@@ -79,7 +82,7 @@ class AvitoParse:
 
     def __paginator(self):
         """Кнопка далее"""
-        logger.info('Страница успешно загружена. Просматриваю объявления')
+        logger.info('Страница загружена. Просматриваю объявления')
         for i in range(self.count):
             if self.stop_event.is_set():
                 break
@@ -106,6 +109,10 @@ class AvitoParse:
             query_params = parse_qs(url_parts.query)
             current_page = int(query_params.get('p', [1])[0])
             query_params['p'] = current_page + 1
+
+            if 's' not in query_params:
+                query_params['s'] = '104'
+
             new_query = urlencode(query_params, doseq=True)
             next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,
                                    url_parts.fragment))
@@ -116,9 +123,11 @@ class AvitoParse:
     def __parse_page(self):
         """Парсит открытую страницу"""
         self.check_stop_event()
-        titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
-        if titles:
-            logger.info(f"Вижу что-то похожее на  объявления")
+        all_titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        if all_titles:
+            logger.info(f"Вижу что-то похожее на объявления")
+        titles = [title for title in all_titles if "avitoSales" not in title.get_attribute("class")]
+
         data_from_general_page = []
         for title in titles:
             """Сбор информации с основной страницы"""
@@ -302,7 +311,7 @@ class AvitoParse:
                     logger.info("Парсинг завершен")
                     return
                 except Exception as err:
-                    logger.error(f"Ошибка: {err}")
+                    logger.debug(f"Ошибка: {err}")
         self.stop_event.clear()
         logger.info("Парсинг завершен")
 
@@ -387,3 +396,4 @@ if __name__ == '__main__':
                          'Если ошибка повторится несколько раз - перезапустите скрипт.'
                          'Если и это не поможет - значит что-то сломалось')
             time.sleep(30)
+

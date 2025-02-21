@@ -1,4 +1,9 @@
 ## Avito Parser v.2.1.3
+Версия 2.1.4
+- Фикс связанный с отправкой сообщений при работе через docker
+- Добавлено игнорирование блока "Рекомендуем к просмотру"
+- Теперь всегда будут показываться сначала самые свежие объявления (раньше бывало по-разному)
+- Убрал отправку некритических ошибок в телеграм
 
 Версия 2.1.3
 - С выходом Chrome v.133 всё сломалось, теперь снова работает 
@@ -49,8 +54,8 @@
 При покупке обязательно выбирайте страну "Россия", остальное на своё усмотрение.
 
 ### Установка
-Если Ваша платформа - Windows 10 или 11, можете использовать портативную версию [скачать](https://disk.yandex.by/d/GHthRHLN1DhDRA) (обновлено 14.02.2025), распаковать архив, запустить parse_avito.exe от имени администратора). Первый запуск может длиться около 1 минуты - это нормально. В этом случае никаких зависимостей устанавливать не нужно, просто пользуйтесь.
-Если не запускается на Вашей системе (бывает), запускайте из исходного кода:
+Если Ваша платформа - Windows 10 или 11, можете использовать портативную версию [скачать](https://disk.yandex.by/d/oH9Id2tzUYNHYg) (обновлено 21.02.2025), распаковать архив, запустить parse_avito.exe от имени администратора). Первый запуск может длиться около 1 минуты - это нормально. В этом случае никаких зависимостей устанавливать не нужно, просто пользуйтесь.
+Если не запускается на Вашей системе (такое бывает), запускайте из исходного кода:
 
 
 Для работы требуется Python 3.11+. Скопируйте проект и установите зависимости:
@@ -65,7 +70,7 @@
   pip install flet
 ```
 
-У Вас также должен быть установлен браузер Google Chrome любой более менее свежей версии
+У Вас также должен быть установлен браузер Google Chrome
 
 Запустите **AvitoParser.py** (режим с графическим интерфейсом)
 
@@ -90,12 +95,15 @@
 - При нажатии на кнопку Test в скрипте, Вам должно прийти сообщение. Если нет, перезагрузите скрипт и попробуйте еще раз
 
 
+Также есть возможность запуска через docker:
 ### Docker
 ```bash
   sudo docker build -t avito_parser:v0.1 .
 ```
+При запуске нужно передать настройки, все настройки можно посмотреть в файле entrypoint.sh. 
+Вот пример запуска:
 ```bash
-sudo docker run -it -e URL_AVITO="https://www.avito.ru/all?q=kawasaki+1000sx https://www.avito.ru/all?q=kawasaki+ninja+1000" -e TG_TOKEN="XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" -e CHAT_ID_TG="-XXXXXXXXXX" -e FAST_SPEED_AVITO=250 -e MAX_VIEW_AVITO=4 -e MIN_PRICE_AVITO=700000 -e KEYS_AVITO="" --mount type=bind,source=/home/alex/AvitoDataKava,destination=/parse_avito/result avito_parser:v0.1 avito
+sudo docker run -it -e URL_AVITO="https://www.avito.ru/all?q=kawasaki+1000sx https://www.avito.ru/all?q=kawasaki+ninja+1000" -e TG_TOKEN="XXXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" -e CHAT_ID_TG="-XXXXXXXXXX" -e FAST_SPEED_AVITO=1 -e MAX_VIEW_AVITO=0 -e MIN_PRICE_AVITO=700000 -e KEYS_AVITO="" --mount type=bind,source=/home/alex/AvitoDataKava,destination=/parse_avito/result avito_parser:v0.1 avito
 
 ```
 
