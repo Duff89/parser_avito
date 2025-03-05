@@ -71,7 +71,7 @@ class AvitoParse:
 
     def __get_url(self):
         if "&s=" not in self.url:
-            self.url += "s=104"
+            self.url += "&s=104"
 
         logger.info(f"Открываю страницу: {self.url}")
         self.driver.open(self.url)
@@ -138,7 +138,7 @@ class AvitoParse:
 
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
                 try:
-                    description = title.find_element(*LocatorAvito.DESCRIPTIONS).get_attribute("content")
+                    description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
                 except Exception as err:
                     logger.debug(f"Ошибка при получении описания: {err}")
                     description = ''
@@ -212,19 +212,26 @@ class AvitoParse:
             except Exception as err:
                 logger.debug(err)
 
-    @staticmethod
-    def __pretty_log(data):
+    def __pretty_log(self, data):
         """Красивый вывод для Telegram"""
         price = data.get("price", "-")
         name = data.get("name", "-")
         id_ = data.get("id", "-")
         seller_name = data.get("seller_name")
+        full_url = data.get("url")
         short_url = f"https://avito.ru/{id_}"
+        # Формируем сообщение для тг
         message = (
-                f"{price}\n{name}\n{short_url}\n"
+                f"*{price}*\n[{name}]({full_url})\n{short_url}\n"
                 + (f"Продавец: {seller_name}\n" if seller_name else "")
         )
-        logger.success(message)
+        try:
+            logger.success(message)
+        except Exception as err:
+            # на случай превышения лимитов
+            logger.debug(err)
+            time.sleep(61)
+            self.__pretty_log(data=data)
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
@@ -359,13 +366,14 @@ if __name__ == '__main__':
     proxy = config["Avito"].get("PROXY", "")
     proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
     need_more_info = int(config["Avito"]["NEED_MORE_INFO"])
-    fast_speed = int(config["Avito"]["NEED_MORE_INFO"])
+    fast_speed = int(config["Avito"]["FAST_SPEED"])
 
     if token and chat_ids:
         for chat_id in chat_ids:
             params = {
                 'token': token,
-                'chat_id': chat_id
+                'chat_id': chat_id,
+                'parse_mode': 'markdown'
             }
             tg_handler = NotificationHandler("telegram", defaults=params)
 

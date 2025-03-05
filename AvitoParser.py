@@ -113,7 +113,8 @@ def main(page: ft.Page):
             for chat_id in chat_ids:
                 params = {
                     'token': token,
-                    'chat_id': chat_id
+                    'chat_id': chat_id,
+                    'parse_mode': 'markdown'
                 }
                 tg_handler = NotificationHandler("telegram", defaults=params)
 
