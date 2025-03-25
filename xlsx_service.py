@@ -26,14 +26,13 @@ class XLSXHandler:
         sheet = workbook.active
         sheet.title = "Data"
         sheet.append([
-            "Название", "Цена", "URL", "Описание", "Просмотров", "Дата публикации", "Продавец", "Адрес"
+            "Название", "Цена", "URL", "Описание", "Просмотров", "Дата публикации", "Продавец", "Адрес", "Ссылка на продавца"
         ])
         workbook.save(self.file_name)
 
     def append_data(self, data):
         workbook = load_workbook(self.file_name)
         sheet = workbook.active
-
         row = [
             data.get("name", '-'),
             data.get("price", '-'),
@@ -42,7 +41,8 @@ class XLSXHandler:
             data.get("views", '-'),
             data.get("date_public", '-'),
             data.get("seller_name", 'no'),
-            data.get("geo", '-')
+            data.get("geo", '-'),
+            data.get("seller_link", '-')
         ]
         sheet.append(row)
         workbook.save(self.file_name)

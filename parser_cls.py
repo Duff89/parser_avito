@@ -46,7 +46,7 @@ class AvitoParse:
         self.title_file = self.__get_file_title()
         self.max_price = int(max_price)
         self.min_price = int(min_price)
-        self.max_views = max_views
+        self.max_views = max_views if max_views and max_views != 0 else None
         self.geo = geo
         self.debug_mode = debug_mode
         self.need_more_info = need_more_info
@@ -70,6 +70,9 @@ class AvitoParse:
             time.sleep(random.randint(300, 350))
 
     def __get_url(self):
+        if "&s=" not in self.url:
+            self.url += "&s=104"
+
         logger.info(f"Открываю страницу: {self.url}")
         self.driver.open(self.url)
 
@@ -79,11 +82,14 @@ class AvitoParse:
 
     def __paginator(self):
         """Кнопка далее"""
-        logger.info('Страница успешно загружена. Просматриваю объявления')
+        logger.info('Страница загружена. Просматриваю объявления')
         for i in range(self.count):
             if self.stop_event.is_set():
                 break
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            try:
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            except Exception:
+                pass
             time.sleep(1)
             self.__parse_page()
             time.sleep(random.randint(2, 4))
@@ -93,7 +99,7 @@ class AvitoParse:
     def open_next_btn(self):
         self.url = self.get_next_page_url(url=self.url)
         logger.info("Следующая страница")
-        self.driver.uc_open(self.url)
+        self.driver.open(self.url)
 
     @staticmethod
     def get_next_page_url(url: str):
@@ -103,6 +109,10 @@ class AvitoParse:
             query_params = parse_qs(url_parts.query)
             current_page = int(query_params.get('p', [1])[0])
             query_params['p'] = current_page + 1
+
+            if 's' not in query_params:
+                query_params['s'] = '104'
+
             new_query = urlencode(query_params, doseq=True)
             next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,
                                    url_parts.fragment))
@@ -113,12 +123,19 @@ class AvitoParse:
     def __parse_page(self):
         """Парсит открытую страницу"""
         self.check_stop_event()
-        titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
-        logger.info(f"Вижу {len(titles)} объявлений на странице")
+        all_titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
+        if all_titles:
+            logger.info(f"Вижу что-то похожее на объявления")
+        titles = [title for title in all_titles if "avitoSales" not in title.get_attribute("class")]
+
         data_from_general_page = []
         for title in titles:
             """Сбор информации с основной страницы"""
-            name = title.find_element(*LocatorAvito.NAME).text
+            try:
+                name = title.find_element(*LocatorAvito.NAME).text
+            except Exception:  # иногда это не объявление
+                continue
+
             if title.find_elements(*LocatorAvito.DESCRIPTIONS):
                 try:
                     description = title.find_element(*LocatorAvito.DESCRIPTIONS).text
@@ -132,8 +149,20 @@ class AvitoParse:
             price = title.find_element(*LocatorAvito.PRICE).get_attribute("content")
             ads_id = title.get_attribute("data-item-id")
 
+            if url and not ads_id:
+                try:
+                    regex = r"_\d+$"
+                    ids = re.findall(pattern=regex, string=url)
+                    if ids:
+                        ads_id = url[-1][:-1]
+                    continue
+                except Exception:
+                    continue
+
+            if not ads_id: continue
+
             if self.is_viewed(ads_id, price):
-                logger.debug("Пропускаю")
+                logger.debug("Пропускаю объявление. Уже видел его")
                 continue
             data = {
                 'name': name,
@@ -142,7 +171,6 @@ class AvitoParse:
                 'price': price,
                 'id': ads_id
             }
-
             all_content = description.lower() + name.lower()
             if self.min_price <= int(price) <= self.max_price:
                 if self.keys_word and self.keys_black_word:
@@ -174,32 +202,40 @@ class AvitoParse:
                     if not self.geo.lower() in str(item_info.get("geo")).lower():
                         continue
 
-                if self.max_views and int(self.max_views) <= int(item_info.get("views", 0)):
-                    logger.info("Количество просмотров больше заданного. Пропускаю объявление")
-                    continue
+                if self.max_views and self.max_views != "0":
+                    if int(self.max_views) <= int(item_info.get("views", 0)):
+                        logger.info("Количество просмотров больше заданного. Пропускаю объявление")
+                        continue
 
                 self.__pretty_log(data=item_info)
                 self.__save_data(data=item_info)
             except Exception as err:
                 logger.debug(err)
 
-    @staticmethod
-    def __pretty_log(data):
+    def __pretty_log(self, data):
         """Красивый вывод для Telegram"""
         price = data.get("price", "-")
         name = data.get("name", "-")
         id_ = data.get("id", "-")
         seller_name = data.get("seller_name")
+        full_url = data.get("url")
         short_url = f"https://avito.ru/{id_}"
+        # Формируем сообщение для тг
         message = (
-                f"{price}\n{name}\n{short_url}\n"
+                f"*{price}*\n[{name}]({full_url})\n{short_url}\n"
                 + (f"Продавец: {seller_name}\n" if seller_name else "")
         )
-        logger.success(message)
+        try:
+            logger.success(message)
+        except Exception as err:
+            # на случай превышения лимитов
+            logger.debug(err)
+            time.sleep(61)
+            self.__pretty_log(data=data)
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
-        self.driver.uc_open(data.get("url"))
+        self.driver.open(data.get("url"))
         if "Доступ ограничен" in self.driver.get_title():
             logger.info("Доступ ограничен: проблема с IP")
             self.ip_block()
@@ -266,9 +302,9 @@ class AvitoParse:
             if self.stop_event and self.stop_event.is_set():
                 logger.info("Процесс будет остановлен")
                 return
-            with SB(uc=True,
+            with SB(uc=False,
                     headed=True if self.debug_mode else False,
-                    headless=True if not self.debug_mode else False,
+                    headless2=True if not self.debug_mode else False,
                     page_load_strategy="eager",
                     block_images=True,
                     agent=random.choice(open("user_agent_pc.txt").readlines()),
@@ -282,7 +318,7 @@ class AvitoParse:
                     logger.info("Парсинг завершен")
                     return
                 except Exception as err:
-                    logger.error(f"Ошибка: {err}")
+                    logger.debug(f"Ошибка: {err}")
         self.stop_event.clear()
         logger.info("Парсинг завершен")
 
@@ -330,13 +366,14 @@ if __name__ == '__main__':
     proxy = config["Avito"].get("PROXY", "")
     proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
     need_more_info = int(config["Avito"]["NEED_MORE_INFO"])
-    fast_speed = int(config["Avito"]["NEED_MORE_INFO"])
+    fast_speed = int(config["Avito"]["FAST_SPEED"])
 
     if token and chat_ids:
         for chat_id in chat_ids:
             params = {
                 'token': token,
-                'chat_id': chat_id
+                'chat_id': chat_id,
+                'parse_mode': 'markdown'
             }
             tg_handler = NotificationHandler("telegram", defaults=params)
 
@@ -362,8 +399,9 @@ if __name__ == '__main__':
             logger.info("Пауза")
             time.sleep(int(freq))
         except Exception as error:
-            logger.error(error)
-            logger.error('Произошла ошибка, но работа будет продолжена через 30 сек. '
+            logger.debug(error)
+            logger.debug('Произошла ошибка, но работа будет продолжена через 30 сек. '
                          'Если ошибка повторится несколько раз - перезапустите скрипт.'
                          'Если и это не поможет - значит что-то сломалось')
             time.sleep(30)
+
