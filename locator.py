@@ -16,4 +16,4 @@ class LocatorAvito:
     COMPANY_NAME = (By.CSS_SELECTOR, "[data-marker='seller-link/link']")
     COMPANY_NAME_TEXT = (By.CSS_SELECTOR, "span")
     GEO = (By.CSS_SELECTOR, "div[class*='style-item-address']")
-
+    OTHER_GEO = (By.CSS_SELECTOR, 'div[elementtiming="bx.gallery.first-item"]')

@@ -1,3 +1,4 @@
+import os
 import random
 import threading
 import time
@@ -6,6 +7,7 @@ from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 import requests
 from notifiers.logging import NotificationHandler
+from selenium.webdriver.common.by import By
 from seleniumbase import SB
 from loguru import logger
 
@@ -13,6 +15,9 @@ from custom_exception import StopEventException
 from db_service import SQLiteDBHandler
 from locator import LocatorAvito
 from xlsx_service import XLSXHandler
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class AvitoParse:
@@ -120,14 +125,32 @@ class AvitoParse:
         except Exception as err:
             logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
 
+    def remove_other_cities(self):
+        """Удаляет предложения из других городов"""
+        try:
+            target_div = self.driver.find_elements(LocatorAvito.OTHER_GEO[1], by="css selector")
+            if target_div:
+                target_div = target_div[0]
+            else:
+                return
+
+            parent_element = target_div.find_element(By.XPATH, './..')
+            time.sleep(2)
+            self.driver.execute_script("arguments[0].remove();", parent_element)
+            logger.info("Лишние города удалены")
+
+        except Exception as e:
+            return
+
     def __parse_page(self):
         """Парсит открытую страницу"""
         self.check_stop_event()
         all_titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
         if all_titles:
+            self.remove_other_cities()
+            all_titles = self.driver.find_elements(LocatorAvito.TITLES[1], by="css selector")
             logger.info(f"Вижу что-то похожее на объявления")
         titles = [title for title in all_titles if "avitoSales" not in title.get_attribute("class")]
-
         data_from_general_page = []
         for title in titles:
             """Сбор информации с основной страницы"""
@@ -353,6 +376,10 @@ if __name__ == '__main__':
             regex = r"http.+"
             url = re.findall(regex, line_url)
 
+    # Если запуск через докер
+    if env_urls := os.getenv("URL_AVITO"):
+        url = env_urls.split(" ")
+
     chat_ids = config["Avito"]["CHAT_ID"].split(",")
     token = config["Avito"]["TG_TOKEN"]
     num_ads = config["Avito"]["NUM_ADS"]
@@ -367,6 +394,10 @@ if __name__ == '__main__':
     proxy_change_ip = config["Avito"].get("PROXY_CHANGE_IP", "")
     need_more_info = int(config["Avito"]["NEED_MORE_INFO"])
     fast_speed = int(config["Avito"]["FAST_SPEED"])
+
+    if proxy and "@" not in str(proxy):
+        logger.info("Прокси переданы неправильно, нужно соблюдать формат user:pass@ip:port")
+        proxy = proxy_change_ip = None
 
     if token and chat_ids:
         for chat_id in chat_ids:
