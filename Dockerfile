@@ -14,8 +14,14 @@ ENV TZ="Europe/Moscow"
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone
 
+
 ENV PATH="/usr/local/bin:$PATH"
 ENV LANG="C.UTF-8"
+
+# Фикс для Chrome/Chromium
+RUN mkdir -p /etc/opt/chrome/policies/managed /etc/opt/chromium/policies/managed && \
+    echo '{ "ExtensionManifestV2Availability": 2 }' > /etc/opt/chrome/policies/managed/policy.json && \
+    echo '{ "ExtensionManifestV2Availability": 2 }' > /etc/opt/chromium/policies/managed/policy.json
 
 COPY requirements.txt /parse_avito/requirements.txt
 # COPY AvitoParser.py /parse_avito/AvitoParser.py
@@ -29,6 +35,7 @@ COPY user_agent_pc.txt /parse_avito/user_agent_pc.txt
 COPY xlsx_service.py /parse_avito/xlsx_service.py
 COPY entrypoint.sh /parse_avito/entrypoint.sh
 COPY version.py /parse_avito/version.py
+COPY run_docker.py /parse_avito/run_docker.py
 RUN chmod +x /parse_avito/entrypoint.sh
 
 # будем собирать из параметров для создания контейнера

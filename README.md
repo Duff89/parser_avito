@@ -1,8 +1,8 @@
-## Avito Parser v.2.1.5
+## Avito Parser v.2.1.7
 
-Версия 2.1.6
-- Будет автоматически проигнорирован блок с рекомендациями от Авито, например из других городов
-- Исправлена ошибка с проблемами url при запуске в докере
+Версия 2.1.7
+- Фикс связанный с блокировкой расширения при работе с прокси
+- Обновил Readme с инструкцией по обходу блокировки расширения Chrome
 
 
 ### Возможности
@@ -35,6 +35,30 @@
 Для полноценного постоянного использования необходимо использовать мобильный прокси (1 шт!), хорошие можно купить [по ссылке](https://mobileproxy.space/?p=92286).  Вот купон на скидку 20%: eMy-r4y-FZE-kMu
 
 При покупке обязательно выбирайте страну "Россия", остальное на своё усмотрение.
+
+<strong>Внимание!</strong> В последних версиях Chrome начал отключать расширения не из маркета, это мешает корректной работе с прокси. Чтобы это исправить нужно сделать следующее: 
+
+######  Для Windows
+Запустите Powershell от имени администратора и выполните команду:
+```bash
+$path = "registry::HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome"; New-Item $path -Force; Set-ItemProperty $path -Name ExtensionManifestV2Availability -Value 2 
+```
+
+######  Для Mac
+Откройте терминал и запустите команды:
+```bash
+defaults write com.google.Chrome ExtensionManifestV2Availability -int 2
+defaults write com.google.Chromium ExtensionManifestV2Availability -int 2
+```
+
+######  Для Linux
+Откройте терминал и запустите команду:
+```bash
+sudo mkdir -p /etc/opt/chrome/policies/managed /etc/opt/chromium/policies/managed
+echo '{ "ExtensionManifestV2Availability": 2 }' | sudo tee /etc/opt/chrome/policies/managed/policy.json /etc/opt/chromium/policies/managed/policy.json
+```
+
+######  Для Docker никакие дополнительные действия не нужны
 
 
 ### Установка
