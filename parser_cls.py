@@ -75,11 +75,13 @@ class AvitoParse:
             time.sleep(random.randint(300, 350))
 
     def __get_url(self):
-        if "&s=" not in self.url:
+        if "&s=" not in self.url and "?" in self.url:
             self.url += "&s=104"
+        else:
+            self.url += "?s=104"
 
         logger.info(f"Открываю страницу: {self.url}")
-        self.driver.open(self.url)
+        self.driver.get(self.url)
 
         if "Доступ ограничен" in self.driver.get_title():
             self.ip_block()
@@ -104,7 +106,7 @@ class AvitoParse:
     def open_next_btn(self):
         self.url = self.get_next_page_url(url=self.url)
         logger.info("Следующая страница")
-        self.driver.open(self.url)
+        self.driver.get(self.url)
 
     @staticmethod
     def get_next_page_url(url: str):
@@ -114,9 +116,6 @@ class AvitoParse:
             query_params = parse_qs(url_parts.query)
             current_page = int(query_params.get('p', [1])[0])
             query_params['p'] = current_page + 1
-
-            if 's' not in query_params:
-                query_params['s'] = '104'
 
             new_query = urlencode(query_params, doseq=True)
             next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,
@@ -258,7 +257,7 @@ class AvitoParse:
 
     def __parse_full_page(self, data: dict) -> dict:
         """Парсит для доп. информации открытое объявление"""
-        self.driver.open(data.get("url"))
+        self.driver.get(data.get("url"))
         if "Доступ ограничен" in self.driver.get_title():
             logger.info("Доступ ограничен: проблема с IP")
             self.ip_block()
@@ -325,7 +324,7 @@ class AvitoParse:
             if self.stop_event and self.stop_event.is_set():
                 logger.info("Процесс будет остановлен")
                 return
-            with SB(uc=False,
+            with SB(uc=True,
                     headed=True if self.debug_mode else False,
                     headless2=True if not self.debug_mode else False,
                     page_load_strategy="eager",

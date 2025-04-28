@@ -247,7 +247,7 @@ def main(page: ft.Page):
         label="Ключевые слова (через Enter)",
         multiline=True,
         min_lines=1,
-        max_lines=5,
+        max_lines=50,
         width=400,
         expand=True,
         tooltip=KEYWORD_INPUT_HELP
@@ -256,7 +256,7 @@ def main(page: ft.Page):
         label="Черный список ключевых слов (через Enter)",
         multiline=True,
         min_lines=1,
-        max_lines=5,
+        max_lines=50,
         width=400,
         expand=True,
         tooltip=KEYWORD_BLACK_INPUT_HELP
