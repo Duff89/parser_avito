@@ -75,11 +75,6 @@ class AvitoParse:
             time.sleep(random.randint(300, 350))
 
     def __get_url(self):
-        if "&s=" not in self.url and "?" in self.url:
-            self.url += "&s=104"
-        else:
-            self.url += "?s=104"
-
         logger.info(f"Открываю страницу: {self.url}")
         self.driver.get(self.url)
 
