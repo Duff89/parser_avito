@@ -35,7 +35,6 @@ COPY user_agent_pc.txt /parse_avito/user_agent_pc.txt
 COPY xlsx_service.py /parse_avito/xlsx_service.py
 COPY entrypoint.sh /parse_avito/entrypoint.sh
 COPY version.py /parse_avito/version.py
-COPY run_docker.py /parse_avito/run_docker.py
 RUN chmod +x /parse_avito/entrypoint.sh
 
 # будем собирать из параметров для создания контейнера
