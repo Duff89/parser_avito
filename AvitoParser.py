@@ -1,93 +1,85 @@
-import configparser
-import re
 import threading
 import time
+from pathlib import Path
 
 import flet as ft
 from loguru import logger
-from notifiers.logging import NotificationHandler
-
 
 from lang import *
+from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
+from tg_sender import SendAdToTg
 from version import VERSION
 
 
 def main(page: ft.Page):
     page.title = f'Parser Avito v {VERSION}'
+    page.window.icon = str(Path(__file__).parent / "assets" / "logo.ico")
     page.theme_mode = ft.ThemeMode.DARK
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.window.width = 1000
-    page.window.height = 950
+    page.window.height = 980
     page.window.min_width = 650
     page.window.min_height = 500
     page.padding = 20
-    tg_logger_init = False
-    config = configparser.ConfigParser()
-    config.read("settings.ini", encoding='utf-8')
     is_run = False
     stop_event = threading.Event()
 
     def set_up():
-        """Работа с настройками"""
-        nonlocal config
+        """Загружает настройки из config.toml и применяет к интерфейсу"""
         try:
-            """Багфикс возможных проблем с экранированием"""
-            url_input.value = "\n".join(config["Avito"]["URL"].split(","))
+            config = load_avito_config("config.toml")
         except Exception as err:
-            logger.debug(f"Ошибка url при открытии конфига: {err}")
-            with open('settings.ini') as file:
-                line_url = file.readlines()[1]
-                regex = r"http.+"
-                all_links = re.findall(regex, line_url)
-                if all_links:
-                    url_input.value = "\n".join(all_links)
-                url_input.value = re.findall(regex, line_url)[0]
-        tg_chat_id.value = "\n".join(config["Avito"]["CHAT_ID"].split(","))
-        tg_token.value = config["Avito"]["TG_TOKEN"]
-        count_page.value = config["Avito"]["NUM_ADS"]
-        pause_sec.value = config["Avito"]["FREQ"]
-        max_view.value = config["Avito"].get("MAX_VIEW")
-        keyword_input.value = "\n".join(config["Avito"]["KEYS"].split(","))
-        black_keyword_input.value = "\n".join(config["Avito"].get("KEYS_BLACK", "").split(","))
-        max_price.value = config["Avito"].get("MAX_PRICE")
-        min_price.value = config["Avito"].get("MIN_PRICE", "0")
-        geo.value = config["Avito"].get("GEO", "")
-        proxy.value = config["Avito"].get("PROXY", "")
-        proxy_change_ip.value = config["Avito"].get("PROXY_CHANGE_IP", "")
-        need_more_info.value = True if config["Avito"].get("NEED_MORE_INFO", "0") == "1" else False
-        debug_mode.value = True if config["Avito"].get("DEBUG_MODE", "0") == "1" else False
-        fast_speed.value = True if config["Avito"].get("FAST_SPEED", "0") == "1" else False
+            logger.error(f"Ошибка при загрузке конфига: {err}")
+            return
+
+        url_input.value = "\n".join(config.urls or [])
+        tg_chat_id.value = "\n".join(config.tg_chat_id or [])
+        tg_token.value = config.tg_token or ""
+        count_page.value = str(config.count)
+        keys_word_white_list.value = "\n".join(config.keys_word_white_list or [])
+        keys_word_black_list.value = "\n".join(config.keys_word_black_list or [])
+        max_price.value = str(config.max_price)
+        min_price.value = str(config.min_price)
+        geo.value = config.geo or ""
+        proxy.value = config.proxy_string or ""
+        proxy_change_ip.value = config.proxy_change_url or ""
+        pause_general.value = config.pause_general or 60
+        pause_between_links.value = config.pause_between_links or 5
+        max_age.value = config.max_age or 3600
+        seller_black_list.value = "\n".join(config.seller_black_list or [])
+
         page.update()
+
+    def to_int_safe(value, default=0):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
 
     def save_config():
-        """Сохраняет конфиг"""
-        config["Avito"]["TG_TOKEN"] = tg_token.value
-        config["Avito"]["CHAT_ID"] = ",".join(tg_chat_id.value.split())
-        config["Avito"]["URL"] = ",".join(str(url_input.value).replace('%', '%%').split())  # bugfix
-        config["Avito"]["NUM_ADS"] = count_page.value
-        config["Avito"]["FREQ"] = pause_sec.value
-        config["Avito"]["KEYS"] = ",".join(keyword_input.value.split("\n"))
-        config["Avito"]["KEYS_BLACK"] = ",".join(black_keyword_input.value.split("\n"))
-        config["Avito"]["MAX_PRICE"] = max_price.value
-        config["Avito"]["MIN_PRICE"] = min_price.value
-        config["Avito"]["MAX_VIEW"] = max_view.value
-        config["Avito"]["GEO"] = geo.value
-        config["Avito"]["PROXY"] = proxy.value
-        config["Avito"]["PROXY_CHANGE_IP"] = proxy_change_ip.value
-        config["Avito"]["NEED_MORE_INFO"] = "1" if need_more_info.value else "0"
-        config["Avito"]["DEBUG_MODE"] = "1" if debug_mode.value else "0"
-        config["Avito"]["FAST_SPEED"] = "1" if fast_speed.value else "0"
-        with open('settings.ini', 'w', encoding='utf-8') as configfile:
-            config.write(configfile)
-        logger.debug("Настройки сохранены")
+        """Сохраняет настройки в TOML, безопасно обрабатывая пустые значения"""
+        config = {"avito": {
+            "tg_token": tg_token.value or "",
+            "tg_chat_id": tg_chat_id.value.splitlines() if tg_chat_id.value else [],
+            "urls": url_input.value.splitlines() if url_input.value else [],
+            "count": to_int_safe(count_page.value, 1),
+            "keys_word_white_list": keys_word_white_list.value.splitlines() if keys_word_white_list.value else [],
+            "keys_word_black_list": keys_word_black_list.value.splitlines() if keys_word_black_list.value else [],
+            "seller_black_list": seller_black_list.value.splitlines() if seller_black_list.value else [],
+            "max_price": to_int_safe(max_price.value, 99999999),
+            "min_price": to_int_safe(min_price.value, 0),
+            "geo": geo.value or "",
+            "proxy_string": proxy.value or "",
+            "proxy_change_url": proxy_change_ip.value or "",
+            "pause_general": to_int_safe(pause_general.value, 3),
+            "pause_between_links": to_int_safe(pause_between_links.value, 1),
+            "max_age": to_int_safe(max_age.value, 86400),
+            "max_count_of_retry": to_int_safe(max_count_of_retry.value, 5),
+        }}
 
-    def check_tg_btn(e):
-        if len(tg_chat_id.value) > 5 and len(tg_token.value) > 10:
-            btn_test_tg.disabled = False
-        else:
-            btn_test_tg.disabled = True
-        page.update()
+        save_avito_config(config)
+        logger.debug("Настройки сохранены в config.toml")
 
     def close_dlg(e):
         dlg_modal_proxy.open = False
@@ -100,42 +92,17 @@ def main(page: ft.Page):
         console_widget.value += message
         page.update()
 
-    def logger_tg():
-        """Логирование в telegram"""
-        nonlocal tg_logger_init
-        token = tg_token.value
-        chat_ids = tg_chat_id.value.split()
-
-        if tg_logger_init:
-            return
-
-        if token and chat_ids:
-            for chat_id in chat_ids:
-                params = {
-                    'token': token,
-                    'chat_id': chat_id,
-                    'parse_mode': 'markdown'
-                }
-                tg_handler = NotificationHandler("telegram", defaults=params)
-
-                """Все логи уровня SUCCESS и выше отсылаются в телегу"""
-                logger.add(tg_handler, level="SUCCESS", format="{message}")
-
-            tg_logger_init = True
-            return None
-
-        logger.info("Данные для отправки в telegram не заполнены. Результат будет сохранен в файл и выведен здесь")
-
     def telegram_log_test(e):
         """Тестирование отправки сообщения в telegram"""
-        logger_tg()
+        logger.info("Сейчас будет проверка данных telegram")
         token = tg_token.value
         chat_id = tg_chat_id.value
         if all([token, chat_id]):
-            logger.success('test')
-
-            logger.info(TG_TEST_MSG)
-            return None
+            SendAdToTg(
+                bot_token=token,
+                chat_id=chat_id.split()
+            ).send_to_tg()
+            return
         logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
 
     dlg_modal_proxy = ft.AlertDialog(
@@ -150,7 +117,7 @@ def main(page: ft.Page):
         actions=[
             ft.TextButton("Купить прокси",
                           on_click=lambda e: page.launch_url(
-                              "https://mobileproxy.space/user.html?buyproxy&coupons_code=eMy-r4y-FZE-kMu")),
+                              PROXY_LINK)),
             ft.TextButton("Отмена", on_click=close_dlg),
 
         ],
@@ -165,6 +132,9 @@ def main(page: ft.Page):
 
     def start_parser(e):
         nonlocal is_run
+        result = check_string()
+        if not result:
+            return
         logger.info("Старт")
         stop_event.clear()
         save_config()
@@ -179,7 +149,7 @@ def main(page: ft.Page):
             if not is_run:
                 return
             logger.info("Пауза между повторами")
-            for _ in range(int(pause_sec.value if pause_sec.value else 300)):
+            for _ in range(int(pause_general.value if pause_general.value else 300)):
                 time.sleep(1)
                 if not is_run:
                     logger.info("Завершено")
@@ -201,29 +171,28 @@ def main(page: ft.Page):
         start_btn.disabled = True
         page.update()
 
-    def required_field_for_more_info(e):
-        if geo.value or (max_view.value and max_view.value != "0"):
-            need_more_info.value = True
-        page.update()
+    def check_string():
+        if proxy.value and "proxy.site" not in proxy.value:
+            dlg_modal = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Проблемы с прокси"),
+                content=ft.Text(UNSUPPORT_PROXY),
+                actions=[
+                    ft.TextButton("Купить совместимые прокси",
+                                  on_click=lambda e: page.launch_url(
+                                      PROXY_LINK)),
+                    ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+                on_dismiss=lambda e: print("Окно закрыто"),
+            )
+            page.open(dlg_modal)
+            return False
+        return True
 
     def run_process():
-        logger_tg()
-        parser = AvitoParse(
-            stop_event=stop_event,
-            url=url_input.value.split(),
-            count=int(count_page.value),
-            keysword_list=keyword_input.value.split("\n") if keyword_input.value else None,
-            keysword_black_list=black_keyword_input.value.split("\n") if black_keyword_input.value else None,
-            max_price=int(max_price.value),
-            min_price=int(min_price.value),
-            geo=geo.value,
-            proxy=proxy.value,
-            proxy_change_url=proxy_change_ip.value,
-            debug_mode=debug_mode.value,
-            need_more_info=need_more_info.value,
-            fast_speed=fast_speed.value,
-            max_views=max_view.value if max_view.value and max_view.value != "0" else None
-        )
+        config = load_avito_config("config.toml")
+        parser = AvitoParse(config, stop_event=stop_event)
         parsing_thread = threading.Thread(target=parser.parse)
         parsing_thread.start()
         parsing_thread.join()
@@ -235,62 +204,83 @@ def main(page: ft.Page):
     url_input = ft.TextField(
         label="Вставьте начальную ссылку или ссылки. Используйте Enter между значениями",
         multiline=True,
-        min_lines=1,
-        max_lines=50,
+        min_lines=3,
+        max_lines=100,
         expand=True,
         tooltip=URL_INPUT_HELP,
+        text_size=12,
+        height=70,
+
     )
-    min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, tooltip=MIN_PRICE_HELP)
-    max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, tooltip=MAX_PRICE_HELP)
-    label_not_required = ft.Text("Дополнительные параметры")
-    keyword_input = ft.TextField(
+    min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, text_size=12, height=40,
+                             tooltip=MIN_PRICE_HELP)
+    max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, text_size=12, height=40,
+                             tooltip=MAX_PRICE_HELP)
+    label_not_required = ft.Text("Дополнительные параметры", height=30)
+    keys_word_white_list = ft.TextField(
         label="Ключевые слова (через Enter)",
         multiline=True,
         min_lines=1,
         max_lines=50,
         width=400,
         expand=True,
-        tooltip=KEYWORD_INPUT_HELP
+        tooltip=KEYWORD_INPUT_HELP,
+        text_size=12, height=60,
     )
-    black_keyword_input = ft.TextField(
+    keys_word_black_list = ft.TextField(
         label="Черный список ключевых слов (через Enter)",
         multiline=True,
         min_lines=1,
         max_lines=50,
         width=400,
         expand=True,
-        tooltip=KEYWORD_BLACK_INPUT_HELP
+        tooltip=KEYWORD_BLACK_INPUT_HELP,
+        text_size=12, height=60,
     )
-    count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP)
-    pause_sec = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, tooltip=PAUSE_SEC_HELP)
-    max_view = ft.TextField(label="Макс. просмотров", width=400, expand=True, tooltip=MAX_VIEW_HELP,
-                            on_change=required_field_for_more_info)
-    tg_token = ft.TextField(label="Token telegram", width=400, on_change=check_tg_btn, expand=True,
+    count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
+                              height=40, )
+    pause_general = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, text_size=12,
+                                 height=40, tooltip=PAUSE_GENERAL_HELP)
+    pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
+                                       height=40, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
+
+    max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=40, expand=True,
+                           tooltip=MAX_AGE_HELP)
+    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=400, text_size=12, height=40, expand=True,
+                                      tooltip=MAX_COUNT_OF_RETRY_HELP)
+    tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=40, expand=True,
                             tooltip=TG_TOKEN_HELP)
-    tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько", width=400, on_change=check_tg_btn,
-                              multiline=True, expand=True, tooltip=TG_CHAT_ID_HELP)
-    btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=True, on_click=telegram_log_test, expand=True,
+    tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько", width=400,
+                              multiline=True, expand=True, text_size=12, height=40, tooltip=TG_CHAT_ID_HELP)
+    btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
-    proxy = ft.TextField(label="Прокси в формате username:password@server:port", width=400, expand=True,
+    proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
                          tooltip=PROXY_HELP)
     proxy_change_ip = ft.TextField(
         label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=***", width=400,
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
     proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
-    geo = ft.TextField(label="Ограничение по городу", width=400, on_change=required_field_for_more_info, expand=True,
+    geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=40,
                        tooltip=GEO_HELP)
+    seller_black_list = ft.TextField(
+        label="Черный список продавцов (через Enter)",
+        multiline=True,
+        min_lines=1,
+        max_lines=100,
+        expand=True,
+        tooltip=BLACK_LIST_OF_SELLER_HELP,
+        text_size=12,
+        height=60,
+    )
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
                                  style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
     console_widget = ft.Text(width=800, height=100, color=ft.colors.GREEN, value="", selectable=True,
                              expand=True)  # , bgcolor=ft.colors.GREY_50)
-    need_more_info = ft.Checkbox("Дополнительная информация", on_change=required_field_for_more_info,
-                                 tooltip=NEED_MORE_INFO_HELP)
-    debug_mode = ft.Checkbox("Режим отладки", tooltip=DEBUG_MODE_HELP)
-    fast_speed = ft.Checkbox("Ускорить", tooltip=SKIP_JS_HELP)
-    buy_me_coffe_btn = ft.TextButton("Донат автору на пиво",
-                                     on_click=lambda e: page.launch_url("https://yoomoney.ru/to/410014382689862"),
+
+    buy_me_coffe_btn = ft.TextButton("Продвинуть разработку",
+                                     on_click=lambda e: page.launch_url(DONAT_LINK),
                                      style=ft.ButtonStyle(color=ft.colors.GREEN_300), expand=True,
                                      tooltip=BUY_ME_COFFE_BTN_HELP)
     report_issue_btn = ft.TextButton("Сообщить о проблеме", on_click=lambda e: page.launch_url(
@@ -305,24 +295,30 @@ def main(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
-            ft.Text(""),
+            # ft.Text(""),
             label_not_required,
 
             ft.Row(
-                [keyword_input, black_keyword_input],
+                [keys_word_white_list, keys_word_black_list],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
             ft.Row(
-                [count_page, pause_sec],
+                [count_page, pause_general],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
             ft.Row(
-                [geo, max_view],
+                [geo, pause_between_links],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
+            ft.Row(
+                [max_age, max_count_of_retry],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            seller_black_list,
             ft.Row(
                 [tg_token, tg_chat_id],
                 alignment=ft.MainAxisAlignment.CENTER,
@@ -336,11 +332,6 @@ def main(page: ft.Page):
             ),
             proxy_btn_help,
             ft.Text(""),
-            ft.Row(
-                [need_more_info, debug_mode, fast_speed],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
 
         ],
         expand=True,
@@ -377,4 +368,5 @@ def main(page: ft.Page):
 
 ft.app(
     target=main,
+    assets_dir="assets",
 )

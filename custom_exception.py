@@ -1,3 +1,0 @@
-
-class StopEventException(Exception):
-    pass

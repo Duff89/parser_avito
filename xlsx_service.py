@@ -1,6 +1,10 @@
 import os
+from datetime import datetime
 from openpyxl import Workbook, load_workbook
 from threading import Lock
+from datetime import datetime
+from tzlocal import get_localzone
+from models import Item
 
 
 class XLSXHandler:
@@ -30,27 +34,30 @@ class XLSXHandler:
             "Цена",
             "URL",
             "Описание",
-            "Просмотров",
             "Дата публикации",
             "Продавец",
             "Адрес",
-            "Ссылка на продавца",
         ])
         workbook.save(self.file_name)
 
-    def append_data(self, data):
+    def append_data(self, ad: Item):
         workbook = load_workbook(self.file_name)
         sheet = workbook.active
+
+        timestamp_sec = ad.sortTimeStamp / 1000
+
+        utc_time = datetime.utcfromtimestamp(timestamp_sec)
+
+        local_time = utc_time.astimezone(get_localzone())
+
         row = [
-            data.get("name", '-'),
-            data.get("price", '-'),
-            data.get("url", '-'),
-            data.get("description", '-'),
-            data.get("views", '-'),
-            data.get("date_public", '-'),
-            data.get("seller_name", 'no'),
-            data.get("geo", '-'),
-            data.get("seller_link", '-'),
+            ad.title,
+            ad.priceDetailed.value,
+            f"https://www.avito.ru/{ad.urlPath}",
+            ad.description,
+            local_time.strftime('%Y-%m-%d %H:%M:%S'),
+            ad.sellerId if ad.sellerId else "",
+            ad.location.name if ad.location else "",
         ]
         sheet.append(row)
         workbook.save(self.file_name)

@@ -1,5 +1,7 @@
 import sqlite3
 
+from models import Item
+
 
 class SQLiteDBHandler:
     """Работа с БД sqlite"""
@@ -30,13 +32,14 @@ class SQLiteDBHandler:
             )
             conn.commit()
 
-    def add_record(self, record_id, price):
+    def add_record(self, ad: Item):
         """Добавляет новую запись в таблицу viewed."""
+
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO viewed (id, price) VALUES (?, ?)",
-                (record_id, price),
+                (ad.id, ad.priceDetailed.value),
             )
             conn.commit()
 
