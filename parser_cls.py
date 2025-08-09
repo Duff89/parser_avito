@@ -362,6 +362,8 @@ if __name__ == "__main__":
             config = load_avito_config("config.toml")
             parser = AvitoParse(config)
             parser.parse()
+            logger.info(f"Парсинг завершен. Пауза {config.pause_general} сек")
+            time.sleep(config.pause_general)
         except Exception as err:
             logger.error(f"Произошла ошибка {err}")
             time.sleep(30)
