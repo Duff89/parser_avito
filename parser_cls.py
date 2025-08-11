@@ -175,6 +175,9 @@ class AvitoParse:
 
                 url = self.get_next_page_url(url=url)
 
+                logger.info(f"Пауза {self.config.pause_between_links} сек.")
+                time.sleep(self.config.pause_between_links)
+
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
         return [ad for ad in ads if ad.id]

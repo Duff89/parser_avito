@@ -37,6 +37,7 @@ class XLSXHandler:
             "Дата публикации",
             "Продавец",
             "Адрес",
+            "Изображения",
         ])
         workbook.save(self.file_name)
 
@@ -50,6 +51,11 @@ class XLSXHandler:
 
         local_time = utc_time.astimezone(get_localzone())
 
+        images_urls = [
+            str(img.root[max(img.root, key=lambda k: int(k.split('x')[0]) * int(k.split('x')[1]))])
+            for img in ad.images
+        ]
+
         row = [
             ad.title,
             ad.priceDetailed.value,
@@ -58,6 +64,7 @@ class XLSXHandler:
             local_time.strftime('%Y-%m-%d %H:%M:%S'),
             ad.sellerId if ad.sellerId else "",
             ad.location.name if ad.location else "",
+            ";".join(images_urls)
         ]
         sheet.append(row)
         workbook.save(self.file_name)
