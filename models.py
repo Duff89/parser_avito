@@ -8,7 +8,7 @@ class Category(BaseModel):
     slug: str
     rootId: int
     compare: bool
-    pageRootId: int
+    pageRootId: int | None
 
 
 class Location(BaseModel):

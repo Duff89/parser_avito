@@ -46,7 +46,7 @@ def main(page: ft.Page):
         proxy_change_ip.value = config.proxy_change_url or ""
         pause_general.value = config.pause_general or 60
         pause_between_links.value = config.pause_between_links or 5
-        max_age.value = config.max_age or 3600
+        max_age.value = config.max_age or 0
         seller_black_list.value = "\n".join(config.seller_black_list or [])
 
         page.update()
@@ -74,7 +74,7 @@ def main(page: ft.Page):
             "proxy_change_url": proxy_change_ip.value or "",
             "pause_general": to_int_safe(pause_general.value, 3),
             "pause_between_links": to_int_safe(pause_between_links.value, 1),
-            "max_age": to_int_safe(max_age.value, 86400),
+            "max_age": to_int_safe(max_age.value, 0),
             "max_count_of_retry": to_int_safe(max_count_of_retry.value, 5),
         }}
 
