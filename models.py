@@ -113,8 +113,8 @@ class Item(BaseModel):
     priceDetailed: PriceDetailed | None = None
     normalizedPrice: Optional[str] | None = None
     priceWithoutDiscount: Optional[str] | None = None
-    discountPercent: Optional[int] | None = None
-    lastMinuteOffer: Optional[str] | None = None
+    discountPercent: Optional[int] | Optional[str] | None = None
+    lastMinuteOffer: Optional[str] | Optional[dict] | None = None
     images: List[Image] | None = None
     imagesCount: int | None = None
     isFavorite: bool | None = None

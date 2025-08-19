@@ -112,7 +112,8 @@ class AvitoParse:
                     proxies=proxy_data,
                     cookies=self.cookies,
                     impersonate="chrome",
-                    timeout=20
+                    timeout=20,
+                    verify=False
                 )
                 logger.debug(f"Попытка {attempt}: {response.status_code}")
 
