@@ -268,7 +268,7 @@ class AvitoParse:
         if not self.config.seller_black_list:
             return ads
         try:
-            return [ad for ad in ads if ad.sellerId and ad.sellerId not in self.config.seller_black_list]
+            return [ad for ad in ads if not ad.sellerId or ad.sellerId not in self.config.seller_black_list]
         except Exception as err:
             logger.debug(f"Ошибка при отсеивании объявления с продавцами из черного списка : {err}")
             return ads
@@ -308,8 +308,8 @@ class AvitoParse:
 
     @staticmethod
     def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:
-        full_text_from_ad = ad.title + ad.description
-        return any([phrase in full_text_from_ad for phrase in phrases])
+        full_text_from_ad = (ad.title + ad.description).lower()
+        return any(phrase.lower() in full_text_from_ad for phrase in phrases)
 
     def is_viewed(self, ad: Item) -> bool:
         """Проверяет, смотрели мы это или нет"""
