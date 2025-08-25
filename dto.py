@@ -26,7 +26,6 @@ class AvitoConfig:
     seller_black_list: List[str] = field(default_factory=list)
     count: int = 1
     tg_token: Optional[str] = None
-    #tg_chat_id: Optional[str] = None
     tg_chat_id: List[str] = None
     max_price: int = 999_999_999
     min_price: int = 0
@@ -36,3 +35,5 @@ class AvitoConfig:
     pause_general: int = 60
     pause_between_links: int = 5
     max_count_of_retry: int = 5
+    ignore_reserv: bool = True
+    ignore_promotion: bool = False

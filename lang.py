@@ -44,3 +44,4 @@ PROXY_LINK = "https://mobileproxy.space/user.html?buyproxy&coupons_code=eMy-r4y-
 TG_TEST_MSG = "Если сообщение пришло к Вам в telegram - значит всё настроено правильно. Если нет - результат парсинга" \
               " всегда можно посмотреть в папке result или ниже. Если Вы сейчас измените token или chat_id -" \
               " перезапустите парсер"
+IGNORE_RESERV_HELP = "Если установить, то объявления в резерве будут проигнорированы "

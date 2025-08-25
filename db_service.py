@@ -43,6 +43,21 @@ class SQLiteDBHandler:
             )
             conn.commit()
 
+    def add_record_from_page(self, ads: list[Item]):
+        """Добавляет несколько записей в таблицу viewed."""
+        records = [(ad.id, ad.priceDetailed.value) for ad in ads]
+
+        with sqlite3.connect(self.db_name) as conn:
+            cursor = conn.cursor()
+            cursor.executemany(
+                """
+                INSERT OR REPLACE INTO viewed (id, price)
+                VALUES (?, ?)
+                """,
+                records,
+            )
+            conn.commit()
+
     def record_exists(self, record_id, price):
         """Проверяет, существует ли запись с заданными id и price."""
         with sqlite3.connect(self.db_name) as conn:

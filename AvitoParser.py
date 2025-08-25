@@ -48,6 +48,8 @@ def main(page: ft.Page):
         pause_between_links.value = config.pause_between_links or 5
         max_age.value = config.max_age or 0
         seller_black_list.value = "\n".join(config.seller_black_list or [])
+        ignore_ads_in_reserv.value = config.ignore_reserv or True
+        ignore_promote_ads.value = config.ignore_promotion or False
 
         page.update()
 
@@ -58,7 +60,7 @@ def main(page: ft.Page):
             return default
 
     def save_config():
-        """Сохраняет настройки в TOML, безопасно обрабатывая пустые значения"""
+        """Сохраняет настройки в TOML"""
         config = {"avito": {
             "tg_token": tg_token.value or "",
             "tg_chat_id": tg_chat_id.value.splitlines() if tg_chat_id.value else [],
@@ -76,6 +78,8 @@ def main(page: ft.Page):
             "pause_between_links": to_int_safe(pause_between_links.value, 1),
             "max_age": to_int_safe(max_age.value, 0),
             "max_count_of_retry": to_int_safe(max_count_of_retry.value, 5),
+            "ignore_reserv": ignore_ads_in_reserv.value,
+            "ignore_promotion": ignore_promote_ads.value
         }}
 
         save_avito_config(config)
@@ -276,7 +280,7 @@ def main(page: ft.Page):
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
                                  style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
-    console_widget = ft.Text(width=800, height=100, color=ft.colors.GREEN, value="", selectable=True,
+    console_widget = ft.Text(width=800, height=80, color=ft.colors.GREEN, value="", selectable=True,
                              expand=True)  # , bgcolor=ft.colors.GREY_50)
 
     buy_me_coffe_btn = ft.TextButton("Продвинуть разработку",
@@ -286,6 +290,9 @@ def main(page: ft.Page):
     report_issue_btn = ft.TextButton("Сообщить о проблеме", on_click=lambda e: page.launch_url(
         "https://github.com/Duff89/parser_avito/issues"), style=ft.ButtonStyle(color=ft.colors.GREY), expand=True,
                                      tooltip=REPORT_ISSUE_BTN_HELP)
+    ignore_ads_in_reserv = ft.Checkbox(label="Игнорировать резервы", value=True, tooltip=IGNORE_RESERV_HELP)
+    ignore_promote_ads = ft.Checkbox(label="Игнорировать продвинутые", value=False)
+
     input_fields = ft.Column(
         [
             label_required,
@@ -331,7 +338,11 @@ def main(page: ft.Page):
                 spacing=0
             ),
             proxy_btn_help,
-            ft.Text(""),
+            ft.Row(
+                [ignore_ads_in_reserv, ignore_promote_ads],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
 
         ],
         expand=True,
@@ -349,7 +360,11 @@ def main(page: ft.Page):
         horizontal_alignment=ft.CrossAxisAlignment.CENTER
     )
     other_btn = ft.Row([buy_me_coffe_btn, report_issue_btn], expand=True, alignment=ft.MainAxisAlignment.CENTER)
-    all_field = ft.Column([input_fields, controls, other_btn], alignment=ft.MainAxisAlignment.CENTER,
+    all_field = ft.Column([
+        other_btn,
+        input_fields,
+        controls,
+    ], alignment=ft.MainAxisAlignment.CENTER,
                           horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def start_page():

@@ -48,9 +48,9 @@ class SendAdToTg:
         full_url = f"https://avito.ru/{ad.urlPath}"
         short_url = f"https://avito.ru/{ad.id}"
         message = (
-                f"*{ad.priceDetailed.value}*\n[{ad.title}]({full_url})\n{short_url}\n"
+                f"*{ad.priceDetailed.value}*" + ("🢁" if ad.isPromotion else "")
+                + f"\n[{ad.title}]({full_url})\n{short_url}\n"
                 + (f"Продавец: {ad.sellerId}\n" if ad.sellerId else "")
+
         )
         return message
-
-

@@ -172,7 +172,8 @@ class AvitoParse:
                     self._send_to_tg(ads=filter_ads)
 
                 logger.info(f"Сохраняю в {self.__get_file_title()}")
-                self.__save_data(ads=filter_ads)
+                if filter_ads:
+                    self.__save_data(ads=filter_ads)
 
                 url = self.get_next_page_url(url=url)
 
@@ -207,7 +208,9 @@ class AvitoParse:
             self._filter_by_address,
             self._filter_viewed,
             self._filter_by_seller,
-            self._filter_by_recent_time
+            self._filter_by_recent_time,
+            self._filter_by_reserve,
+            self._filter_by_promotion,
         ]
 
         for filter_fn in filters:
@@ -264,6 +267,16 @@ class AvitoParse:
                 ad.sellerId = seller_id
         return ads
 
+    @staticmethod
+    def _add_promotion_to_ads(ads: list[Item]) -> list[Item]:
+        for ad in ads:
+            ad.isPromotion = any(
+                v.get("title") == "Продвинуто"
+                for step in (ad.iva or {}).get("DateInfoStep", [])
+                for v in step.payload.get("vas", [])
+            )
+        return ads
+
     def _filter_by_seller(self, ads: list[Item]) -> list[Item]:
         if not self.config.seller_black_list:
             return ads
@@ -283,13 +296,32 @@ class AvitoParse:
             logger.debug(f"Ошибка при отсеивании слишком старых объявлений: {err}")
             return ads
 
+    def _filter_by_reserve(self, ads: list[Item]) -> list[Item]:
+        if not self.config.ignore_reserv:
+            return ads
+        try:
+            return [ad for ad in ads if not ad.isReserved]
+        except Exception as err:
+            logger.debug(f"Ошибка при отсеивании объявлений в резерве: {err}")
+            return ads
+
+    def _filter_by_promotion(self, ads: list[Item]) -> list[Item]:
+        ads = self._add_promotion_to_ads(ads=ads)
+        if not self.config.ignore_promotion:
+            return ads
+        try:
+            return [ad for ad in ads if not ad.isPromotion]
+        except Exception as err:
+            logger.debug(f"Ошибка при отсеивании продвинутых объявлений: {err}")
+            return ads
+
     def change_ip(self) -> bool:
         if not self.config.proxy_change_url:
             logger.info("Сейчас бы была смена ip, но мы без прокси")
             return False
         logger.info("Меняю IP")
         try:
-            res = requests.get(url=self.config.proxy_change_url)
+            res = requests.get(url=self.config.proxy_change_url, verify=False)
             if res.status_code == 200:
                 logger.info("IP изменен")
                 return True
@@ -331,17 +363,16 @@ class AvitoParse:
 
     def __save_data(self, ads: list[Item]) -> None:
         """Сохраняет результат в файл keyword*.xlsx и в БД"""
-        for ad in ads:
-            try:
-                self.xlsx_handler.append_data(ad=ad)
-            except Exception as err:
-                logger.info(f"При сохранении в Excel {ad} ошибка {err}")
+        try:
+            self.xlsx_handler.append_data_from_page(ads=ads)
+        except Exception as err:
+            logger.info(f"При сохранении в Excel ошибка {err}")
 
-            """сохраняет просмотренные объявления"""
-            try:
-                self.db_handler.add_record(ad=ad)
-            except Exception as err:
-                logger.info(f"При сохранении в БД {ad} ошибка {err}")
+        """сохраняет просмотренные объявления"""
+        try:
+            self.db_handler.add_record_from_page(ads=ads)
+        except Exception as err:
+            logger.info(f"При сохранении в БД ошибка {err}")
 
     @staticmethod
     def get_next_page_url(url: str):
