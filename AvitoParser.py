@@ -48,8 +48,9 @@ def main(page: ft.Page):
         pause_between_links.value = config.pause_between_links or 5
         max_age.value = config.max_age or 0
         seller_black_list.value = "\n".join(config.seller_black_list or [])
-        ignore_ads_in_reserv.value = config.ignore_reserv or True
-        ignore_promote_ads.value = config.ignore_promotion or False
+        ignore_ads_in_reserv.value = config.ignore_reserv
+        ignore_promote_ads.value = config.ignore_promotion
+        max_count_of_retry.value = config.max_count_of_retry or 5
 
         page.update()
 

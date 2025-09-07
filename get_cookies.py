@@ -139,7 +139,8 @@ class PlaywrightClient:
             return await self.load_page(url)
         finally:
             if hasattr(self, "browser"):
-                await self.browser.close()
+                if self.browser:
+                    await self.browser.close()
             if hasattr(self, "playwright"):
                 await self.playwright.stop()
 
