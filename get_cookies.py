@@ -25,7 +25,7 @@ class PlaywrightClient:
         self.proxy = proxy
         self.proxy_split_obj = self.get_proxy_obj()
         self.headless = headless
-        self.user_agent = user_agent or random.choice(USER_AGENTS)
+        self.user_agent = user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
         self.context = self.page = self.browser = None
 
     @staticmethod
@@ -45,7 +45,7 @@ class PlaywrightClient:
             return None
         try:
             self.proxy.proxy_string = self.del_protocol(proxy_string=self.proxy.proxy_string)
-            logger.info(self.proxy.proxy_string)
+            logger.info(f"Не ошибка, а название страницы: {self.proxy.proxy_string}")
             if "@" in self.proxy.proxy_string:
                 ip_port, user_pass = self.proxy.proxy_string.split("@")
                 if "." in user_pass:
@@ -198,7 +198,7 @@ class PlaywrightClient:
             await route.continue_()
 
 
-async def get_cookies(proxy: Proxy = None, headless: bool = True) -> dict:
+async def get_cookies(proxy: Proxy = None, headless: bool = True) -> tuple:
     logger.info("Пытаюсь обновить cookies")
     client = PlaywrightClient(
         proxy=proxy,
@@ -206,4 +206,4 @@ async def get_cookies(proxy: Proxy = None, headless: bool = True) -> dict:
     )
     ads_id = str(random.randint(1111111111, 9999999999))
     cookies = await client.get_cookies(f"https://www.avito.ru/{ads_id}")
-    return cookies
+    return cookies, client.user_agent

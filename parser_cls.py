@@ -41,6 +41,7 @@ class AvitoParse:
         self.stop_event = stop_event
         self.cookies = None
         self.session = requests.Session()
+        self.headers = HEADERS
 
         logger.info(f"Запуск AvitoParse с настройками:\n{config}")
 
@@ -62,12 +63,14 @@ class AvitoParse:
         logger.info("Работаем без прокси")
         return None
 
-    def get_cookies(self, max_retries: int = 5, delay: float = 2.0) -> dict | None:
+    def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
         for attempt in range(1, max_retries + 1):
             try:
-                cookies = asyncio.run(get_cookies(proxy=self.proxy_obj, headless=True))
+                cookies, user_agent = asyncio.run(get_cookies(proxy=self.proxy_obj, headless=True))
                 if cookies:
                     logger.info(f"[get_cookies] Успешно получены cookies с попытки {attempt}")
+
+                    self.headers["user-agent"] = user_agent
                     return cookies
                 else:
                     raise ValueError("Пустой результат cookies")
@@ -108,12 +111,13 @@ class AvitoParse:
             try:
                 response = self.session.get(
                     url=url,
-                    headers=HEADERS,
+                    headers=self.headers,
                     proxies=proxy_data,
                     cookies=self.cookies,
                     impersonate="chrome",
                     timeout=20,
-                    verify=False
+                    verify=False,
+                    http_version=3
                 )
                 logger.debug(f"Попытка {attempt}: {response.status_code}")
 
@@ -171,9 +175,11 @@ class AvitoParse:
                 if self.tg_handler:
                     self._send_to_tg(ads=filter_ads)
 
-                logger.info(f"Сохраняю в {self.__get_file_title()}")
                 if filter_ads:
+                    logger.info(f"Сохраняю в {self.__get_file_title()}")
                     self.__save_data(ads=filter_ads)
+                else:
+                    logger.info("Сохранять нечего")
 
                 url = self.get_next_page_url(url=url)
 
@@ -191,7 +197,7 @@ class AvitoParse:
             for _script in soup.select('script'):
                 if data_type == 'mime':
                     if _script.get('type') == 'mime/invalid' and _script.get(
-                            'data-mfe-state') == 'true':  # and 'sandbox' not in _script.text:
+                            'data-mfe-state') == 'true':
                         mime_data = json.loads(html.unescape(_script.text)).get('data', {})
                         return mime_data
 

@@ -293,6 +293,8 @@ def main(page: ft.Page):
                                      tooltip=REPORT_ISSUE_BTN_HELP)
     ignore_ads_in_reserv = ft.Checkbox(label="Игнорировать резервы", value=True, tooltip=IGNORE_RESERV_HELP)
     ignore_promote_ads = ft.Checkbox(label="Игнорировать продвинутые", value=False)
+    one_time_start = ft.Checkbox(label="Выключить после завершения работы", value=False, tooltip=ONE_TIME_START_HELP,
+                                 disabled=True)
 
     input_fields = ft.Column(
         [
@@ -340,7 +342,7 @@ def main(page: ft.Page):
             ),
             proxy_btn_help,
             ft.Row(
-                [ignore_ads_in_reserv, ignore_promote_ads],
+                [ignore_ads_in_reserv, ignore_promote_ads, one_time_start],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
@@ -366,7 +368,7 @@ def main(page: ft.Page):
         input_fields,
         controls,
     ], alignment=ft.MainAxisAlignment.CENTER,
-                          horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def start_page():
         page.add(ft.Column(
