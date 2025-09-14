@@ -20,6 +20,7 @@ from get_cookies import get_cookies
 from load_config import load_avito_config
 from models import ItemsResponse, Item
 from tg_sender import SendAdToTg
+from version import VERSION
 from xlsx_service import XLSXHandler
 
 DEBUG_MODE = False
@@ -42,8 +43,10 @@ class AvitoParse:
         self.cookies = None
         self.session = requests.Session()
         self.headers = HEADERS
+        self.good_request_count = 0
+        self.bad_request_count = 0
 
-        logger.info(f"Запуск AvitoParse с настройками:\n{config}")
+        logger.info(f"Запуск AvitoParse v{VERSION} с настройками:\n{config}")
 
     def get_tg_handler(self) -> SendAdToTg | None:
         if all([self.config.tg_token, self.config.tg_chat_id]):
@@ -124,6 +127,8 @@ class AvitoParse:
                 if response.status_code >= 500:
                     raise requests.RequestsError(f"Ошибка сервера: {response.status_code}")
                 if response.status_code == 429:
+                    self.bad_request_count += 1
+                    self.session = requests.Session()
                     self.change_ip()
                     if attempt >= 2:
                         self.cookies = self.get_cookies()
@@ -133,6 +138,7 @@ class AvitoParse:
                     raise requests.RequestsError(f"Заблокирован: {response.status_code}")
 
                 self.save_cookies()
+                self.good_request_count += 1
                 return response.text
             except requests.RequestsError as e:
                 logger.debug(f"Попытка {attempt} закончилась неуспешно: {e}")
@@ -185,6 +191,7 @@ class AvitoParse:
 
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
+        logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
 
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:

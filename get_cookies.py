@@ -45,7 +45,6 @@ class PlaywrightClient:
             return None
         try:
             self.proxy.proxy_string = self.del_protocol(proxy_string=self.proxy.proxy_string)
-            logger.info(f"Не ошибка, а название страницы: {self.proxy.proxy_string}")
             if "@" in self.proxy.proxy_string:
                 ip_port, user_pass = self.proxy.proxy_string.split("@")
                 if "." in user_pass:
@@ -149,7 +148,7 @@ class PlaywrightClient:
 
     async def check_block(self, page, context):
         title = await page.title()
-        logger.info(title)
+        logger.info(f"Не ошибка, а название страницы: {title}")
         if BAD_IP_TITLE in str(title).lower():
             logger.info("IP заблокирован")
             await context.clear_cookies()
