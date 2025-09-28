@@ -207,7 +207,7 @@ class AvitoParse:
 
         logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
 
-        if self.config.one_time_start:
+        if self.config.one_time_start and self.tg_handler:
             self.tg_handler.send_to_tg(msg="Парсинг Авито завершён. Все ссылки обработаны")
             self.stop_event = True
 
