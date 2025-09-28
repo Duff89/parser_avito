@@ -37,3 +37,5 @@ class AvitoConfig:
     max_count_of_retry: int = 5
     ignore_reserv: bool = True
     ignore_promotion: bool = False
+    one_time_start: bool = False
+    one_file_for_link: bool = False

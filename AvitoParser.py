@@ -51,6 +51,8 @@ def main(page: ft.Page):
         ignore_ads_in_reserv.value = config.ignore_reserv
         ignore_promote_ads.value = config.ignore_promotion
         max_count_of_retry.value = config.max_count_of_retry or 5
+        one_time_start.value = config.one_time_start
+        one_file_for_link.value = config.one_file_for_link
 
         page.update()
 
@@ -80,7 +82,9 @@ def main(page: ft.Page):
             "max_age": to_int_safe(max_age.value, 0),
             "max_count_of_retry": to_int_safe(max_count_of_retry.value, 5),
             "ignore_reserv": ignore_ads_in_reserv.value,
-            "ignore_promotion": ignore_promote_ads.value
+            "ignore_promotion": ignore_promote_ads.value,
+            "one_time_start": one_time_start.value,
+            "one_file_for_link": one_file_for_link.value,
         }}
 
         save_avito_config(config)
@@ -106,7 +110,7 @@ def main(page: ft.Page):
             SendAdToTg(
                 bot_token=token,
                 chat_id=chat_id.split()
-            ).send_to_tg()
+            ).send_to_tg(msg="Это тестовое сообщение")
             return
         logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
 
@@ -162,6 +166,9 @@ def main(page: ft.Page):
                     start_btn.disabled = False
                     page.update()
                     return
+            if one_time_start.value:
+                stop_event.set()
+                page.window.close()
 
     def stop_parser(e):
         nonlocal is_run
@@ -243,20 +250,20 @@ def main(page: ft.Page):
         text_size=12, height=60,
     )
     count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
-                              height=40, )
+                              height=30, )
     pause_general = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, text_size=12,
-                                 height=40, tooltip=PAUSE_GENERAL_HELP)
+                                 height=30, tooltip=PAUSE_GENERAL_HELP)
     pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
-                                       height=40, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
+                                       height=30, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
 
     max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=40, expand=True,
                            tooltip=MAX_AGE_HELP)
     max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=400, text_size=12, height=40, expand=True,
                                       tooltip=MAX_COUNT_OF_RETRY_HELP)
-    tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=40, expand=True,
+    tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=70, expand=True,
                             tooltip=TG_TOKEN_HELP)
-    tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько", width=400,
-                              multiline=True, expand=True, text_size=12, height=40, tooltip=TG_CHAT_ID_HELP)
+    tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько через Enter", width=400,
+                              multiline=True, expand=True, text_size=12, height=70, tooltip=TG_CHAT_ID_HELP)
     btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
     proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
@@ -266,7 +273,7 @@ def main(page: ft.Page):
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
     proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
-    geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=40,
+    geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=30,
                        tooltip=GEO_HELP)
     seller_black_list = ft.TextField(
         label="Черный список продавцов (через Enter)",
@@ -276,13 +283,13 @@ def main(page: ft.Page):
         expand=True,
         tooltip=BLACK_LIST_OF_SELLER_HELP,
         text_size=12,
-        height=60,
+        height=50,
     )
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
                                  style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
-    console_widget = ft.Text(width=800, height=80, color=ft.colors.GREEN, value="", selectable=True,
-                             expand=True)  # , bgcolor=ft.colors.GREY_50)
+    console_widget = ft.Text(width=800, height=60, color=ft.colors.GREEN, value="", selectable=True,
+                             expand=True)
 
     buy_me_coffe_btn = ft.TextButton("Продвинуть разработку",
                                      on_click=lambda e: page.launch_url(DONAT_LINK),
@@ -291,10 +298,11 @@ def main(page: ft.Page):
     report_issue_btn = ft.TextButton("Сообщить о проблеме", on_click=lambda e: page.launch_url(
         "https://github.com/Duff89/parser_avito/issues"), style=ft.ButtonStyle(color=ft.colors.GREY), expand=True,
                                      tooltip=REPORT_ISSUE_BTN_HELP)
-    ignore_ads_in_reserv = ft.Checkbox(label="Игнорировать резервы", value=True, tooltip=IGNORE_RESERV_HELP)
-    ignore_promote_ads = ft.Checkbox(label="Игнорировать продвинутые", value=False)
-    one_time_start = ft.Checkbox(label="Выключить после завершения работы", value=False, tooltip=ONE_TIME_START_HELP,
-                                 disabled=True)
+    ignore_ads_in_reserv = ft.Checkbox(label="Игнор-ть резервы", value=True, tooltip=IGNORE_RESERV_HELP)
+    ignore_promote_ads = ft.Checkbox(label="Игнор-ть продвинутые", value=False)
+    one_time_start = ft.Checkbox(label="Выключить после завершения работы", value=False, tooltip=ONE_TIME_START_HELP)
+    one_file_for_link = ft.Checkbox(label="Отдельный файл для каждой ссылки", value=False,
+                                    tooltip=ONE_FILE_FOR_LINK_HELP)
 
     input_fields = ft.Column(
         [
@@ -342,7 +350,7 @@ def main(page: ft.Page):
             ),
             proxy_btn_help,
             ft.Row(
-                [ignore_ads_in_reserv, ignore_promote_ads, one_time_start],
+                [ignore_ads_in_reserv, ignore_promote_ads, one_time_start, one_file_for_link],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),

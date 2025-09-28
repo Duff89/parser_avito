@@ -153,17 +153,23 @@ class AvitoParse:
     def parse(self):
         self.load_cookies()
 
-        for url in self.config.urls:
+        if self.config.one_file_for_link:
+            self.xlsx_handler = None
+
+        for _index, url in enumerate(self.config.urls):
             for i in range(0, self.config.count):
                 if self.stop_event and self.stop_event.is_set():
                     return
-
                 if DEBUG_MODE:
                     html_code = open("response.txt", "r", encoding="utf-8").read()
                 else:
                     html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
+
                 if not html_code:
                     return self.parse()
+
+                if not self.xlsx_handler and self.config.one_file_for_link:
+                    self.xlsx_handler = XLSXHandler(f"result/{_index + 1}.xlsx")
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
                 try:
@@ -176,13 +182,17 @@ class AvitoParse:
 
                 ads = self._add_seller_to_ads(ads=ads)
 
+                if not ads:
+                    logger.info("Объявления закончились, заканчиваю работу с данной ссылкой")
+                    break
+
                 filter_ads = self.filter_ads(ads=ads)
 
-                if self.tg_handler:
+                if self.tg_handler and not self.config.one_time_start:
                     self._send_to_tg(ads=filter_ads)
 
                 if filter_ads:
-                    logger.info(f"Сохраняю в {self.__get_file_title()}")
+                    logger.info(f"Сохраняю")
                     self.__save_data(ads=filter_ads)
                 else:
                     logger.info("Сохранять нечего")
@@ -191,7 +201,15 @@ class AvitoParse:
 
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
+
+            if self.config.one_file_for_link:
+                self.xlsx_handler = None
+
         logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
+
+        if self.config.one_time_start:
+            self.tg_handler.send_to_tg(msg="Парсинг Авито завершён. Все ссылки обработаны")
+            self.stop_event = True
 
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
@@ -387,14 +405,15 @@ class AvitoParse:
         except Exception as err:
             logger.info(f"При сохранении в БД ошибка {err}")
 
-    @staticmethod
-    def get_next_page_url(url: str):
+    def get_next_page_url(self, url: str):
         """Получает следующую страницу"""
         try:
             url_parts = urlparse(url)
             query_params = parse_qs(url_parts.query)
             current_page = int(query_params.get('p', [1])[0])
             query_params['p'] = current_page + 1
+            if self.config.one_time_start:
+                logger.debug(f"Страница {current_page}")
 
             new_query = urlencode(query_params, doseq=True)
             next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,

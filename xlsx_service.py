@@ -8,15 +8,9 @@ from models import Item
 
 class XLSXHandler:
     """Сохраняет информацию в xlsx"""
-    _instance = None
-    _lock = Lock()
 
-    def __new__(cls, file_name):
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(XLSXHandler, cls).__new__(cls)
-                cls._instance._initialize(file_name)
-        return cls._instance
+    def __init__(self, file_name):
+        self._initialize(file_name=file_name)
 
     def _initialize(self, file_name):
         self.file_name = file_name

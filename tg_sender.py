@@ -14,9 +14,9 @@ class SendAdToTg:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
-    def __send_to_tg(self, chat_id: str | int, ad: Item = None):
-        if not ad:
-            message = "Это тестовое сообщение"
+    def __send_to_tg(self, chat_id: str | int, ad: Item = None, msg: str = None):
+        if msg:
+            message = msg
             self.max_retries = 2
         else:
             message = self.format_ad(ad)
@@ -39,9 +39,9 @@ class SendAdToTg:
                 else:
                     logger.debug("Не удалось отправить сообщение после всех попыток.")
 
-    def send_to_tg(self, ad: Item = None):
+    def send_to_tg(self, ad: Item = None, msg: str = None):
         for chat_id in self.chat_id:
-            self.__send_to_tg(chat_id=chat_id, ad=ad)
+            self.__send_to_tg(chat_id=chat_id, ad=ad, msg=msg)
 
     @staticmethod
     def format_ad(ad: Item) -> str:
