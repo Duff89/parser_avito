@@ -434,6 +434,9 @@ if __name__ == "__main__":
         try:
             parser = AvitoParse(config)
             parser.parse()
+            if config.one_time_start:
+                logger.info("Парсинг завершен т.к. включён one_time_start в настройках")
+                break
             logger.info(f"Парсинг завершен. Пауза {config.pause_general} сек")
             time.sleep(config.pause_general)
         except Exception as err:
