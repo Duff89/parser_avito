@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 
 import flet as ft
+import tkinter as tk
 from loguru import logger
 
 from lang import *
@@ -10,6 +11,20 @@ from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
 from tg_sender import SendAdToTg
 from version import VERSION
+
+
+def get_screen_size() -> tuple:
+    """Возвращает размеры основного экрана (ширина, высота)"""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        width = root.winfo_screenwidth()
+        height = root.winfo_screenheight()
+        root.destroy()
+        return width, height
+    except Exception as e:
+        logger.error(f"Не удалось получить размер экрана: {e}")
+        return 1920, 1080
 
 
 def main(page: ft.Page):
@@ -22,6 +37,11 @@ def main(page: ft.Page):
     page.window.min_width = 650
     page.window.min_height = 500
     page.padding = 20
+
+    screen_width, screen_height = get_screen_size()
+    page.window.left = int((screen_width - page.window.width) / 2)
+    page.window.top = int((screen_height - page.window.height) / 2)
+
     is_run = False
     stop_event = threading.Event()
 

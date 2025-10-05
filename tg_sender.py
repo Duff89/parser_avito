@@ -28,6 +28,10 @@ class SendAdToTg:
                     "text": message,
                     "parse_mode": "markdown"
                 })
+                if response.status_code == 400:
+                    logger.warning("Не удалось отправить сообщение. Проверьте правильность введенных данных")
+                    break
+
                 response.raise_for_status()
                 logger.debug(f"Сообщение успешно отправлено (попытка {attempt})")
                 break
