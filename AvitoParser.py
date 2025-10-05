@@ -4,6 +4,7 @@ from pathlib import Path
 
 import flet as ft
 from loguru import logger
+import screeninfo
 
 from lang import *
 from load_config import save_avito_config, load_avito_config
@@ -22,6 +23,15 @@ def main(page: ft.Page):
     page.window.min_width = 650
     page.window.min_height = 500
     page.padding = 20
+
+    # Центрируем окно приложения на основном мониторе
+    monitor = next(
+        (m for m in screeninfo.get_monitors() if m.is_primary), 
+        screeninfo.get_monitors()[0]
+    )
+    page.window.left = int((monitor.width - page.window.width) / 2)
+    page.window.top = int((monitor.height - page.window.height) / 2)
+
     is_run = False
     stop_event = threading.Event()
 
