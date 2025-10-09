@@ -8,7 +8,6 @@ from typing import Optional, Dict, List
 
 from dto import Proxy, ProxySplit
 
-USER_AGENTS = [ua.strip() for ua in open("user_agent_pc.txt").readlines()]
 MAX_RETRIES = 3
 RETRY_DELAY = 10
 RETRY_DELAY_WITHOUT_PROXY = 300
@@ -17,10 +16,10 @@ BAD_IP_TITLE = "проблема с ip"
 
 class PlaywrightClient:
     def __init__(
-        self,
-        proxy: Proxy = None,
-        headless: bool = True,
-        user_agent: Optional[str] = None,
+            self,
+            proxy: Proxy = None,
+            headless: bool = True,
+            user_agent: Optional[str] = None,
     ):
         self.proxy = proxy
         self.proxy_split_obj = self.get_proxy_obj()
@@ -112,7 +111,7 @@ class PlaywrightClient:
         self.context = await self.browser.new_context(**context_args)
         self.page = await self.context.new_page()
         # block images, not use now
-        #await self.page.route("**/*", lambda route, request: asyncio.create_task(self._block_images(route, request)))
+        # await self.page.route("**/*", lambda route, request: asyncio.create_task(self._block_images(route, request)))
         await self._stealth(self.page)
 
     async def load_page(self, url: str):
@@ -153,7 +152,7 @@ class PlaywrightClient:
             logger.info("IP заблокирован")
             await context.clear_cookies()
             await self.change_ip()
-            await page.reload(timeout=60*1000)
+            await page.reload(timeout=60 * 1000)
 
     async def change_ip(self, retries: int = MAX_RETRIES):
         if not self.proxy_split_obj:
