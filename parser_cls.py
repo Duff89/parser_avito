@@ -173,7 +173,7 @@ class AvitoParse:
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
                 try:
-                    ads_models = ItemsResponse(**data_from_page.get("catalog", {}))
+                    ads_models = ItemsResponse(**data_from_page.get("data", {}).get("catalog"))
                 except ValidationError as err:
                     logger.error(f"При валидации объявлений произошла ошибка: {err}")
                     continue
@@ -220,11 +220,21 @@ class AvitoParse:
         soup = BeautifulSoup(html_code, "html.parser")
         try:
             for _script in soup.select('script'):
-                if data_type == 'mime':
-                    if _script.get('type') == 'mime/invalid' and _script.get(
-                            'data-mfe-state') == 'true':
-                        mime_data = json.loads(html.unescape(_script.text)).get('data', {})
-                        return mime_data
+                script_type = _script.get('type')
+
+                if data_type == 'mime' and script_type == 'mime/invalid':
+                    script_content = html.unescape(_script.text)
+                    parsed_data = json.loads(script_content)
+
+                    if 'state' in parsed_data:
+                        return parsed_data['state']
+
+                    elif 'data' in parsed_data:
+                        logger.info("data")
+                        return parsed_data['data']
+
+                    else:
+                        return parsed_data
 
         except Exception as err:
             logger.error(f"Ошибка при поиске информации на странице: {err}")
