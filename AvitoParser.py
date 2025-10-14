@@ -73,6 +73,7 @@ def main(page: ft.Page):
         max_count_of_retry.value = config.max_count_of_retry or 5
         one_time_start.value = config.one_time_start
         one_file_for_link.value = config.one_file_for_link
+        parse_views.value = config.parse_views
 
         page.update()
 
@@ -105,6 +106,7 @@ def main(page: ft.Page):
             "ignore_promotion": ignore_promote_ads.value,
             "one_time_start": one_time_start.value,
             "one_file_for_link": one_file_for_link.value,
+            "parse_views": parse_views.value,
         }}
 
         save_avito_config(config)
@@ -248,7 +250,7 @@ def main(page: ft.Page):
                              tooltip=MIN_PRICE_HELP)
     max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, text_size=12, height=40,
                              tooltip=MAX_PRICE_HELP)
-    label_not_required = ft.Text("Дополнительные параметры", height=30)
+    label_not_required = ft.Text("Дополнительные параметры", height=20)
     keys_word_white_list = ft.TextField(
         label="Ключевые слова (через Enter)",
         multiline=True,
@@ -276,9 +278,9 @@ def main(page: ft.Page):
     pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
                                        height=30, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
 
-    max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=40, expand=True,
+    max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=30, expand=True,
                            tooltip=MAX_AGE_HELP)
-    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=400, text_size=12, height=40, expand=True,
+    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=400, text_size=12, height=30, expand=True,
                                       tooltip=MAX_COUNT_OF_RETRY_HELP)
     tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=70, expand=True,
                             tooltip=TG_TOKEN_HELP)
@@ -323,6 +325,8 @@ def main(page: ft.Page):
     one_time_start = ft.Checkbox(label="Выключить после завершения работы", value=False, tooltip=ONE_TIME_START_HELP)
     one_file_for_link = ft.Checkbox(label="Отдельный файл для каждой ссылки", value=False,
                                     tooltip=ONE_FILE_FOR_LINK_HELP)
+    parse_views = ft.Checkbox(label="Парсить просмотры", value=False,
+                                    tooltip=PARSE_VIEWS_HELP)
 
     input_fields = ft.Column(
         [
@@ -371,6 +375,11 @@ def main(page: ft.Page):
             proxy_btn_help,
             ft.Row(
                 [ignore_ads_in_reserv, ignore_promote_ads, one_time_start, one_file_for_link],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            ft.Row(
+                [one_file_for_link, parse_views],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),

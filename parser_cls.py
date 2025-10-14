@@ -17,6 +17,7 @@ from common_data import HEADERS
 from db_service import SQLiteDBHandler
 from dto import Proxy, AvitoConfig
 from get_cookies import get_cookies
+from hide_private_data import log_config
 from load_config import load_avito_config
 from models import ItemsResponse, Item
 from tg_sender import SendAdToTg
@@ -46,7 +47,7 @@ class AvitoParse:
         self.good_request_count = 0
         self.bad_request_count = 0
 
-        logger.info(f"Запуск AvitoParse v{VERSION} с настройками:\n{config}")
+        log_config(config=self.config, version=VERSION)
 
     def get_tg_handler(self) -> SendAdToTg | None:
         if all([self.config.tg_token, self.config.tg_chat_id]):
@@ -130,7 +131,7 @@ class AvitoParse:
                     self.bad_request_count += 1
                     self.session = requests.Session()
                     self.change_ip()
-                    if attempt >= 2:
+                    if attempt >= 3:
                         self.cookies = self.get_cookies()
                     raise requests.RequestsError(f"Слишком много запросов: {response.status_code}")
                 if response.status_code in [403, 302]:
@@ -190,6 +191,8 @@ class AvitoParse:
 
                 if self.tg_handler and not self.config.one_time_start:
                     self._send_to_tg(ads=filter_ads)
+
+                filter_ads = self.parse_views(ads=ads)
 
                 if filter_ads:
                     logger.info(f"Сохраняю")
@@ -355,6 +358,36 @@ class AvitoParse:
         except Exception as err:
             logger.debug(f"Ошибка при отсеивании продвинутых объявлений: {err}")
             return ads
+
+    def parse_views(self, ads: list[Item]) -> list[Item]:
+        if not self.config.parse_views:
+            return ads
+
+        logger.info("Начинаю парсинг просмотров")
+
+        for ad in ads:
+            try:
+                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
+                ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
+                delay = random.uniform(0.1, 0.9)
+                time.sleep(delay)
+            except Exception as err:
+                logger.warning(f"Ошибка при парсинге {ad.urlPath}: {err}")
+                continue
+
+        return ads
+
+    @staticmethod
+    def _extract_views(html: str) -> tuple:
+        soup = BeautifulSoup(html, "html.parser")
+
+        def extract_digits(element):
+            return int(''.join(filter(str.isdigit, element.get_text()))) if element else None
+
+        total = extract_digits(soup.select_one('[data-marker="item-view/total-views"]'))
+        today = extract_digits(soup.select_one('[data-marker="item-view/today-views"]'))
+
+        return total, today
 
     def change_ip(self) -> bool:
         if not self.config.proxy_change_url:

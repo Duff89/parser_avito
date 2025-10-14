@@ -34,6 +34,8 @@ class XLSXHandler:
             "Координаты",
             "Изображения",
             "Поднято",
+            "Просмотры (всего)",
+            "Просмотры (сегодня)",
         ])
         workbook.save(self.file_name)
 
@@ -86,7 +88,9 @@ class XLSXHandler:
                 self.get_item_address_user(ad=ad),
                 self.get_item_coords(ad=ad),
                 ";".join(images_urls),
-                "Да" if ad.isPromotion else "Нет"
+                "Да" if ad.isPromotion else "Нет",
+                ad.total_views if ad.total_views is not None else "",
+                ad.today_views if ad.today_views is not None else ""
             ]
             sheet.append(row)
 
