@@ -246,11 +246,11 @@ class AvitoParse:
     def filter_ads(self, ads: list[Item]) -> list[Item]:
         """Сортирует объявления"""
         filters = [
+            self._filter_viewed,
             self._filter_by_price_range,
             self._filter_by_black_keywords,
             self._filter_by_white_keyword,
             self._filter_by_address,
-            self._filter_viewed,
             self._filter_by_seller,
             self._filter_by_recent_time,
             self._filter_by_reserve,
