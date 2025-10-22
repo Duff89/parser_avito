@@ -2,24 +2,60 @@
 tg_token = ""
 tg_chat_id = []
 urls = [
-    "https://www.avito.ru/all/gruzoviki_i_spetstehnika/buldozery-ASgBAgICAURU3E0?cd=1",
-    "https://www.avito.ru/krasnodar/telefony/mobilnye_telefony/apple/iphone_16-ASgBAgICA0SywA3GsYwVtMANzqs5sMENiPw3?cd=1",
+    "https://www.avito.ru/moskva/telefony/mobilnye_telefony/apple/iphone_15_pro/128_gb-ASgBAgICBESywA2Sn~0RtMANzqs5sMENiPw35uAN9sFc?f=ASgBAQECBESywA2Sn~0RtMANzqs5sMENiPw35uAN9sFcAUDo6w4k~v3bAvz92wIBRcaaDBl7ImZyb20iOjQxODIwLCJ0byI6NTEwMDB9&geoCoords=55.770727%2C37.684506&radius=50&s=104&searchRadius=50",
+    "https://www.avito.ru/moskva/telefony/mobilnye_telefony/apple/iphone_15_pro/256_gb-ASgBAgICBESywA2Sn~0RtMANzqs5sMENiPw35uAN~MFc?f=ASgBAQECBESywA2Sn~0RtMANzqs5sMENiPw35uAN~MFcAUDo6w4k~v3bAvz92wIBRcaaDBl7ImZyb20iOjQ1MDAwLCJ0byI6NTUwMDB9&geoCoords=55.770727%2C37.684506&radius=50&s=104&searchRadius=50",
+    "https://www.avito.ru/moskva/telefony/mobilnye_telefony/apple/iphone_16_pro/256_gb-ASgBAgICBESywA3KsYwVtMANzqs5sMENiPw35uAN~MFc?f=ASgBAQECBESywA3KsYwVtMANzqs5sMENiPw35uAN~MFcAUDo6w4k~v3bAvz92wIBRcaaDBl7ImZyb20iOjU1NjIzLCJ0byI6NjkwMDB9&geoCoords=55.770727%2C37.684506&radius=50&s=104&searchRadius=50",
+    "https://www.avito.ru/moskva/telefony/mobilnye_telefony/apple/iphone_16_pro/128_gb-ASgBAgICBESywA3KsYwVtMANzqs5sMENiPw35uAN9sFc?f=ASgBAQECBESywA3KsYwVtMANzqs5sMENiPw35uAN9sFcAUDo6w4k~v3bAvz92wIBRcaaDBl7ImZyb20iOjUyNDgwLCJ0byI6NjQwMDB9&geoCoords=55.770727%2C37.684506&radius=50&s=104&searchRadius=50",
+    "https://www.avito.ru/moskva/telefony/mobilnye_telefony/apple/iphone_14_pro/128_gb-ASgBAgICBESywA3OjuUQtMANzqs5sMENiPw35uAN9sFc?f=ASgBAQECBESywA3OjuUQtMANzqs5sMENiPw35uAN9sFcAUDo6w4k~v3bAvz92wIBRcaaDBl7ImZyb20iOjMyMDAwLCJ0byI6NDAwMDB9&geoCoords=55.770727%2C37.684506&radius=50&s=104&searchRadius=50",
 ]
-count = 1
+count = 3
 keys_word_white_list = []
 keys_word_black_list = []
-seller_black_list = []
+seller_black_list = [
+    "370611b51073cae35ac7ced95d0ef000",
+    "i189516525",
+    "i192312598",
+    "i107035775",
+    "i219842312",
+    "i217212891",
+    "9aeb468a1f437b1500cc9319b350c0a6",
+    "bf22de1674a39eab9d360a768b9ec9ef",
+    "02dd3cbb3ba3979289acf90c94b6ebe2",
+    "ligadigital",
+    "i149229880",
+    "ae19558d79ed116ba8433a6fc73a8953",
+    "475557d0ac8cb216b5d350d92fa13ee9",
+    "i129006905",
+    "i36359008",
+    "21b8fa6d466600da4aef7d5a076361b7",
+    "lavrotech",
+    "00a89125688947e64422a2cf1f14939b",
+    "9cf153bc037d7d902bd7629da88920a2",
+    "i20376358",
+    "e65161061a107e283962b7eea182bebc",
+    "i141359937",
+    "f90b00cae6f670dfd4f1abc17e9eded7",
+    "36987bb4f557c6aeec7750aa3be94038",
+    "5e876e3e68ff4ea8bbfc76c7f162f638",
+    "8b9a153b9b91739755e81b37ba19a70c",
+    "098c4c328da27a654b0afa1dab3aa006",
+    "i200622164",
+    "9cf153bc037d7d902bd7629da88920a2",
+    "i189516525",
+    "5192a2c7fe4206437d438bde0bcb826b",
+    "i137507234",
+]
 max_price = 9999999999
 min_price = 1000
 geo = ""
-proxy_string = ""
-proxy_change_url = ""
-pause_general = 60
-pause_between_links = 2
-max_age = 0
+proxy_string = "aVfeB7:eSYnKyjNUm6S@mproxy.site:15310"
+proxy_change_url = "https://changeip.mobileproxy.space/?proxy_key=55e893bfff7bbe78e608e5c74205cd7a"
+pause_general = 3
+pause_between_links = 1
+max_age = 90000
 max_count_of_retry = 5
-ignore_reserv = false
-ignore_promotion = false
+ignore_reserv = true
+ignore_promotion = true
 one_time_start = false
 one_file_for_link = false
 parse_views = false
