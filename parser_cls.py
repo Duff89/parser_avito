@@ -483,5 +483,5 @@ if __name__ == "__main__":
             logger.info(f"Парсинг завершен. Пауза {config.pause_general} сек")
             time.sleep(config.pause_general)
         except Exception as err:
-            logger.error(f"Произошла ошибка {err}")
+            logger.error(f"Произошла ошибка {err}. Будет повторный запуск через 30 сек.")
             time.sleep(30)
