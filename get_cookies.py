@@ -7,6 +7,7 @@ from playwright_stealth import Stealth
 from typing import Optional, Dict, List
 
 from dto import Proxy, ProxySplit
+from playwright_setup import ensure_playwright_installed
 
 MAX_RETRIES = 3
 RETRY_DELAY = 10
@@ -20,12 +21,14 @@ class PlaywrightClient:
             proxy: Proxy = None,
             headless: bool = True,
             user_agent: Optional[str] = None,
+            stop_event=None
     ):
         self.proxy = proxy
         self.proxy_split_obj = self.get_proxy_obj()
         self.headless = headless
         self.user_agent = user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
         self.context = self.page = self.browser = None
+        self.stop_event = stop_event
 
     @staticmethod
     def check_protocol(ip_port: str) -> str:
@@ -73,6 +76,7 @@ class PlaywrightClient:
         return dict(pair.split("=", 1) for pair in cookie_str.split("; ") if "=" in pair)
 
     async def launch_browser(self):
+        ensure_playwright_installed("chromium")
         stealth = Stealth()
         self.playwright_context = stealth.use_async(async_playwright())
         playwright = await self.playwright_context.__aenter__()
@@ -120,6 +124,8 @@ class PlaywrightClient:
                              wait_until="domcontentloaded")
 
         for attempt in range(10):
+            if self.stop_event and self.stop_event.is_set():
+                return {}
             await self.check_block(self.page, self.context)
             raw_cookie = await self.page.evaluate("() => document.cookie")
             cookie_dict = self.parse_cookie_string(raw_cookie)
@@ -141,6 +147,8 @@ class PlaywrightClient:
                     await self.browser.close()
             if hasattr(self, "playwright"):
                 await self.playwright.stop()
+            if hasattr(self, "playwright_context") and self.playwright_context:
+                await self.playwright_context.__aexit__(None, None, None)
 
     async def get_cookies(self, url: str) -> dict:
         return await self.extract_cookies(url)
@@ -157,7 +165,10 @@ class PlaywrightClient:
     async def change_ip(self, retries: int = MAX_RETRIES):
         if not self.proxy_split_obj:
             logger.info("Сейчас бы сменили ip, но прокси нет - поэтому ждем")
-            await asyncio.sleep(RETRY_DELAY_WITHOUT_PROXY)
+            for i in range(RETRY_DELAY_WITHOUT_PROXY):
+                if self.stop_event and self.stop_event.is_set():
+                    return False
+                await asyncio.sleep(1)
             return False
         for attempt in range(1, retries + 1):
             try:
@@ -196,11 +207,12 @@ class PlaywrightClient:
             await route.continue_()
 
 
-async def get_cookies(proxy: Proxy = None, headless: bool = True) -> tuple:
+async def get_cookies(proxy: Proxy = None, headless: bool = True, stop_event=None) -> tuple:
     logger.info("Пытаюсь обновить cookies")
     client = PlaywrightClient(
         proxy=proxy,
-        headless=headless
+        headless=headless,
+        stop_event=stop_event
     )
     ads_id = str(random.randint(1111111111, 9999999999))
     cookies = await client.get_cookies(f"https://www.avito.ru/{ads_id}")

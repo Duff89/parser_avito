@@ -40,3 +40,5 @@ class AvitoConfig:
     one_time_start: bool = False
     one_file_for_link: bool = False
     parse_views: bool = False
+    save_xlsx: bool = True
+

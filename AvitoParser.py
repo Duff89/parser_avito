@@ -74,6 +74,7 @@ def main(page: ft.Page):
         one_time_start.value = config.one_time_start
         one_file_for_link.value = config.one_file_for_link
         parse_views.value = config.parse_views
+        save_xlsx.value = config.save_xlsx
 
         page.update()
 
@@ -107,6 +108,7 @@ def main(page: ft.Page):
             "one_time_start": one_time_start.value,
             "one_file_for_link": one_file_for_link.value,
             "parse_views": parse_views.value,
+            "save_xlsx": save_xlsx.value,
         }}
 
         save_avito_config(config)
@@ -327,6 +329,8 @@ def main(page: ft.Page):
                                     tooltip=ONE_FILE_FOR_LINK_HELP)
     parse_views = ft.Checkbox(label="Парсить просмотры", value=False,
                                     tooltip=PARSE_VIEWS_HELP)
+    save_xlsx = ft.Checkbox(label="Сохранять в Excel", value=True,
+                              tooltip=SAVE_XLSX_HELP)
 
     input_fields = ft.Column(
         [
@@ -379,7 +383,7 @@ def main(page: ft.Page):
                 spacing=0
             ),
             ft.Row(
-                [one_file_for_link, parse_views],
+                [one_file_for_link, parse_views, save_xlsx],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),

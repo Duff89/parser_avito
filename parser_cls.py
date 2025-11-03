@@ -69,8 +69,12 @@ class AvitoParse:
 
     def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
         for attempt in range(1, max_retries + 1):
+            if self.stop_event and self.stop_event.is_set():
+                return None
+
             try:
-                cookies, user_agent = asyncio.run(get_cookies(proxy=self.proxy_obj, headless=True))
+                cookies, user_agent = asyncio.run(
+                    get_cookies(proxy=self.proxy_obj, headless=True, stop_event=self.stop_event))
                 if cookies:
                     logger.info(f"[get_cookies] Успешно получены cookies с попытки {attempt}")
 
@@ -106,7 +110,9 @@ class AvitoParse:
     def fetch_data(self, url, retries=3, backoff_factor=1):
         proxy_data = None
         if self.proxy_obj:
-            proxy_data = {"https": f"http://{self.config.proxy_string}"}
+            proxy_data = {
+                          "https": f"http://{self.config.proxy_string}"
+            }
 
         for attempt in range(1, retries + 1):
             if self.stop_event and self.stop_event.is_set():
@@ -121,7 +127,6 @@ class AvitoParse:
                     impersonate="chrome",
                     timeout=20,
                     verify=False,
-                    http_version=3
                 )
                 logger.debug(f"Попытка {attempt}: {response.status_code}")
 
@@ -152,12 +157,11 @@ class AvitoParse:
                     return None
 
     def parse(self):
-        self.load_cookies()
-
         if self.config.one_file_for_link:
             self.xlsx_handler = None
 
         for _index, url in enumerate(self.config.urls):
+            ads_in_link = []
             for i in range(0, self.config.count):
                 if self.stop_event and self.stop_event.is_set():
                     return
@@ -167,14 +171,18 @@ class AvitoParse:
                     html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
 
                 if not html_code:
-                    return self.parse()
+                    logger.warning(
+                        f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
+                    time.sleep(self.config.pause_between_links)
+                    continue
 
                 if not self.xlsx_handler and self.config.one_file_for_link:
                     self.xlsx_handler = XLSXHandler(f"result/{_index + 1}.xlsx")
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
                 try:
-                    ads_models = ItemsResponse(**data_from_page.get("data", {}).get("catalog"))
+                    catalog = data_from_page.get("data", {}).get("catalog") or {}
+                    ads_models = ItemsResponse(**catalog)
                 except ValidationError as err:
                     logger.error(f"При валидации объявлений произошла ошибка: {err}")
                     continue
@@ -195,10 +203,10 @@ class AvitoParse:
                 filter_ads = self.parse_views(ads=filter_ads)
 
                 if filter_ads:
-                    logger.info(f"Сохраняю")
-                    self.__save_data(ads=filter_ads)
-                else:
-                    logger.info("Сохранять нечего")
+                    self.__save_viewed(ads=filter_ads)
+
+                    if self.config.save_xlsx:
+                        ads_in_link.extend(filter_ads)
 
                 url = self.get_next_page_url(url=url)
 
@@ -207,6 +215,12 @@ class AvitoParse:
 
             if self.config.one_file_for_link:
                 self.xlsx_handler = None
+
+            if ads_in_link:
+                logger.info(f"Сохраняю в Excel {len(ads_in_link)} объявлений")
+                self.__save_data(ads=ads_in_link)
+            else:
+                logger.info("Сохранять нечего")
 
         logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
 
@@ -432,6 +446,8 @@ class AvitoParse:
         title_file = 'all'
         if self.config.keys_word_white_list:
             title_file = "-".join(list(map(str.lower, self.config.keys_word_white_list)))
+            if len(title_file) > 50:
+                title_file = title_file[:50]
 
         return f"result/{title_file}.xlsx"
 
@@ -442,7 +458,8 @@ class AvitoParse:
         except Exception as err:
             logger.info(f"При сохранении в Excel ошибка {err}")
 
-        """сохраняет просмотренные объявления"""
+    def __save_viewed(self, ads: list[Item]) -> None:
+        """Сохраняет просмотренные объявления"""
         try:
             self.db_handler.add_record_from_page(ads=ads)
         except Exception as err:
