@@ -1,0 +1,25 @@
+[project]
+name = "parser-avito"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4==4.13.4",
+    "curl-cffi",
+    "flet==0.24.1",
+    "httpx",
+    "loguru==0.7.0",
+    "openpyxl==3.1.5",
+    "playwright==1.52.0",
+    "playwright-stealth==2.0.0",
+    "pydantic==2.9.2",
+    "pyexcel==0.7.1",
+    "pyexcel-io==0.6.7",
+    "pyexcel-xlsx==0.6.0",
+    "pyyaml==6.0.2",
+    "requests==2.32.3",
+    "tomli-w==1.2.0",
+    "tzdata==2025.2",
+    "tzlocal==5.3.1",
+]

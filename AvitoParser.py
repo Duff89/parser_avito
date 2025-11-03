@@ -11,6 +11,7 @@ from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
 from tg_sender import SendAdToTg
 from version import VERSION
+from url_generator import generate_urls_from_query
 
 
 def get_screen_size() -> tuple:
@@ -226,19 +227,32 @@ def main(page: ft.Page):
             return False
         return True
 
-    def run_process():
-        config = load_avito_config("config.toml")
-        parser = AvitoParse(config, stop_event=stop_event)
-        parsing_thread = threading.Thread(target=parser.parse)
-        parsing_thread.start()
-        parsing_thread.join()
-        start_btn.disabled = False
-        start_btn.text = "Старт"
-        page.update()
 
     label_required = ft.Text("Обязательные параметры", size=20)
+    query_input = ft.TextField(
+        label="Введите поисковые запросы (каждый с новой строки)",
+        multiline=True,
+        min_lines=1,
+        max_lines=10,
+        expand=True,
+        tooltip="Например: 'бульдозер' или 'iphone 16 краснодар'",
+        text_size=12,
+        height=50,
+    )
+    
+    def generate_and_fill_urls(e):
+        queries = query_input.value.splitlines()
+        if not queries:
+            logger.error("Поле с поисковыми запросами не заполнено.")
+            return
+        generated_urls = generate_urls_from_query(queries)
+        url_input.value = "\n".join(generated_urls)
+        page.update()
+
+    generate_urls_btn = ft.ElevatedButton("Сформировать ссылки", on_click=generate_and_fill_urls, expand=True)
+
     url_input = ft.TextField(
-        label="Вставьте начальную ссылку или ссылки. Используйте Enter между значениями",
+        label="Начальные ссылки (будут сгенерированы)",
         multiline=True,
         min_lines=3,
         max_lines=100,
@@ -246,10 +260,10 @@ def main(page: ft.Page):
         tooltip=URL_INPUT_HELP,
         text_size=12,
         height=70,
-
+        read_only=True,
     )
     min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, text_size=12, height=40,
-                             tooltip=MIN_PRICE_HELP)
+                              tooltip=MIN_PRICE_HELP)
     max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, text_size=12, height=40,
                              tooltip=MAX_PRICE_HELP)
     label_not_required = ft.Text("Дополнительные параметры", height=20)
@@ -335,6 +349,8 @@ def main(page: ft.Page):
     input_fields = ft.Column(
         [
             label_required,
+            query_input,
+            generate_urls_btn,
             url_input,
             ft.Row(
                 [min_price, max_price],
