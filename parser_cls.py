@@ -23,6 +23,7 @@ from models import ItemsResponse, Item
 from tg_sender import SendAdToTg
 from version import VERSION
 from xlsx_service import XLSXHandler
+from json_service import JSONHandler
 
 DEBUG_MODE = False
 
@@ -39,7 +40,8 @@ class AvitoParse:
         self.proxy_obj = self.get_proxy_obj()
         self.db_handler = SQLiteDBHandler()
         self.tg_handler = self.get_tg_handler()
-        self.xlsx_handler = XLSXHandler(self.__get_file_title())
+        self.xlsx_handler = XLSXHandler(self.__get_file_title(ext='xlsx'))
+        self.json_handler = JSONHandler(self.__get_file_title(ext='json'))
         self.stop_event = stop_event
         self.cookies = None
         self.session = requests.Session()
@@ -159,6 +161,7 @@ class AvitoParse:
     def parse(self):
         if self.config.one_file_for_link:
             self.xlsx_handler = None
+            self.json_handler = None
 
         for _index, url in enumerate(self.config.urls):
             ads_in_link = []
@@ -178,6 +181,8 @@ class AvitoParse:
 
                 if not self.xlsx_handler and self.config.one_file_for_link:
                     self.xlsx_handler = XLSXHandler(f"result/{_index + 1}.xlsx")
+                if not self.json_handler and self.config.one_file_for_link:
+                    self.json_handler = JSONHandler(f"result/{_index + 1}.json")
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
                 try:
@@ -208,14 +213,22 @@ class AvitoParse:
                     if self.config.save_xlsx:
                         ads_in_link.extend(filter_ads)
 
+                    if self.config.save_json:
+                        ads_in_link.extend(filter_ads)
+
                 url = self.get_next_page_url(url=url)
 
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
 
+            if self.config.one_file_for_link:
+                self.xlsx_handler = None
+                self.json_handler = None
+
             if ads_in_link:
-                logger.info(f"Сохраняю в Excel {len(ads_in_link)} объявлений")
-                self.__save_data(ads=ads_in_link)
+                unique_ads = list({ad.id: ad for ad in ads_in_link}.values())
+                logger.info(f"Сохраняю {len(unique_ads)} уникальных объявлений")
+                self.__save_data(ads=unique_ads)
             else:
                 logger.info("Сохранять нечего")
 
@@ -438,7 +451,7 @@ class AvitoParse:
         published_time = datetime.utcfromtimestamp(timestamp_ms / 1000)
         return (now - published_time) <= timedelta(seconds=max_age_seconds)
 
-    def __get_file_title(self) -> str:
+    def __get_file_title(self, ext: str) -> str:
         """Определяет название файла"""
         title_file = 'all'
         if self.config.keys_word_white_list:
@@ -446,14 +459,21 @@ class AvitoParse:
             if len(title_file) > 50:
                 title_file = title_file[:50]
 
-        return f"result/{title_file}.xlsx"
+        return f"result/{title_file}.{ext}"
 
     def __save_data(self, ads: list[Item]) -> None:
         """Сохраняет результат в файл keyword*.xlsx и в БД"""
-        try:
-            self.xlsx_handler.append_data_from_page(ads=ads)
-        except Exception as err:
-            logger.info(f"При сохранении в Excel ошибка {err}")
+        if self.config.save_xlsx:
+            try:
+                self.xlsx_handler.append_data_from_page(ads=ads)
+            except Exception as err:
+                logger.info(f"При сохранении в Excel ошибка {err}")
+
+        if self.config.save_json:
+            try:
+                self.json_handler.append_data_from_page(ads=ads)
+            except Exception as err:
+                logger.info(f"При сохранении в JSON ошибка {err}")
 
     def __save_viewed(self, ads: list[Item]) -> None:
         """Сохраняет просмотренные объявления"""
