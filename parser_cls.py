@@ -331,8 +331,11 @@ class AvitoParse:
 
     def _add_seller_to_ads(self, ads: list[Item]) -> list[Item]:
         for ad in ads:
-            if seller_id := self._extract_seller_slug(data=ad):
+            seller_id, seller_url = self._extract_seller_info(data=ad)
+            if seller_id:
                 ad.sellerId = seller_id
+            if seller_url:
+                ad.seller_url = seller_url
         return ads
 
     @staticmethod
@@ -430,11 +433,15 @@ class AvitoParse:
         return self.change_ip()
 
     @staticmethod
-    def _extract_seller_slug(data):
-        match = re.search(r"/brands/([^/?#]+)", str(data))
-        if match:
-            return match.group(1)
-        return None
+    def _extract_seller_info(data) -> tuple[str | None, str | None]:
+        data_str = str(data)
+        seller_id_match = re.search(r"/brands/([^/?#]+)", data_str)
+        seller_id = seller_id_match.group(1) if seller_id_match else None
+
+        seller_url_match = re.search(r"profile_url=([^,']+)", data_str)
+        seller_url = unquote(seller_url_match.group(1)) if seller_url_match else None
+
+        return seller_id, seller_url
 
     @staticmethod
     def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:

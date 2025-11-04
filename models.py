@@ -144,6 +144,7 @@ class Item(BaseModel):
     closestAddressId: int | None = None
     isSparePartsCompatibility: bool | None = None
     sellerId: str | None = None
+    seller_url: str | None = None
     isPromotion: bool = False
     total_views: int | None = None
     today_views: int | None = None
