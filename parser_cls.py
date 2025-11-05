@@ -213,14 +213,14 @@ class AvitoParse:
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
 
-            if self.config.one_file_for_link:
-                self.xlsx_handler = None
-
             if ads_in_link:
                 logger.info(f"Сохраняю в Excel {len(ads_in_link)} объявлений")
                 self.__save_data(ads=ads_in_link)
             else:
                 logger.info("Сохранять нечего")
+
+            if self.config.one_file_for_link:
+                self.xlsx_handler = None
 
         logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
 
