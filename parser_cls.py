@@ -68,6 +68,9 @@ class AvitoParse:
         return None
 
     def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
+        if not self.config.use_webdriver:
+            return
+
         for attempt in range(1, max_retries + 1):
             if self.stop_event and self.stop_event.is_set():
                 return None
@@ -132,16 +135,13 @@ class AvitoParse:
 
                 if response.status_code >= 500:
                     raise requests.RequestsError(f"Ошибка сервера: {response.status_code}")
-                if response.status_code == 429:
+                if response.status_code == [302, 403, 429]:
                     self.bad_request_count += 1
                     self.session = requests.Session()
-                    self.change_ip()
                     if attempt >= 3:
                         self.cookies = self.get_cookies()
+                    self.change_ip()
                     raise requests.RequestsError(f"Слишком много запросов: {response.status_code}")
-                if response.status_code in [403, 302]:
-                    self.cookies = self.get_cookies()
-                    raise requests.RequestsError(f"Заблокирован: {response.status_code}")
 
                 self.save_cookies()
                 self.good_request_count += 1

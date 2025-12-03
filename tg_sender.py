@@ -1,5 +1,6 @@
 import requests
 import time
+import re
 
 from loguru import logger
 
@@ -10,24 +11,42 @@ class SendAdToTg:
     def __init__(self, bot_token: str, chat_id: list, max_retries: int = 5, retry_delay: int = 5):
         self.bot_token = bot_token
         self.chat_id = chat_id
-        self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        self.api_url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
         self.max_retries = max_retries
         self.retry_delay = retry_delay
 
+    @staticmethod
+    def escape_markdown(text: str) -> str:
+        """Экранирует спецсимволы MarkdownV2, кроме """
+        if not text:
+            return ""
+        text = str(text).replace("\xa0", " ")
+        return re.sub(r'([_\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
     def __send_to_tg(self, chat_id: str | int, ad: Item = None, msg: str = None):
         if msg:
-            message = msg
-            self.max_retries = 2
+            payload = {
+                "chat_id": chat_id,
+                "text": msg,
+                "parse_mode": "MarkdownV2",
+            }
+            return requests.post(f"https://api.telegram.org/bot{self.bot_token}/sendMessage", json=payload)
         else:
             message = self.format_ad(ad)
 
+        _image_url = self.get_first_image(ad=ad)
         for attempt in range(1, self.max_retries + 1):
             try:
-                response = requests.post(self.api_url, json={
+                payload = {
                     "chat_id": chat_id,
-                    "text": message,
-                    "parse_mode": "markdown"
-                })
+                    "caption": message,
+                    "photo": _image_url,
+                    "parse_mode": "MarkdownV2",
+                    "disable_web_page_preview": True,
+                }
+                logger.info(payload)
+
+                response = requests.post(self.api_url, json=payload)
                 if response.status_code == 400:
                     logger.warning("Не удалось отправить сообщение. Проверьте правильность введенных данных")
                     break
@@ -48,13 +67,49 @@ class SendAdToTg:
             self.__send_to_tg(chat_id=chat_id, ad=ad, msg=msg)
 
     @staticmethod
-    def format_ad(ad: Item) -> str:
-        full_url = f"https://avito.ru/{ad.urlPath}"
-        short_url = f"https://avito.ru/{ad.id}"
-        message = (
-                f"*{ad.priceDetailed.value}*" + ("🢁" if ad.isPromotion else "")
-                + f"\n[{ad.title}]({full_url})\n{short_url}\n"
-                + (f"Продавец: {ad.sellerId}\n" if ad.sellerId else "")
+    def get_first_image(ad: Item):
+        def get_largest_image_url(img):
+            best_key = max(
+                img.root.keys(),
+                key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
+            )
+            return str(img.root[best_key])
 
-        )
+        images_urls = [get_largest_image_url(img) for img in ad.images]
+        if images_urls:
+            return images_urls[0]
+
+
+    @staticmethod
+    def format_ad(ad: Item) -> str:
+        def esc(text: str) -> str:
+            if not text:
+                return ""
+            s = str(text).replace("\xa0", " ")
+            return re.sub(r'([_\[\]()~`>#+\-=|{}.!])', r'\\\1', s)
+
+        price = esc(getattr(ad, "priceDetailed", {}).get("value", "") if isinstance(getattr(ad, "priceDetailed", None),
+                                                                                    dict) else getattr(ad.priceDetailed,
+                                                                                                       "value",
+                                                                                                       getattr(ad,
+                                                                                                               "priceDetailed",
+                                                                                                               "")))
+        title = esc(getattr(ad, "title", ""))
+        short_url = f"https://avito.ru/{getattr(ad, 'id', '')}"
+        seller = esc(str(getattr(ad, "sellerId", ""))) if getattr(ad, "sellerId", None) else ""
+
+        parts = []
+        if price:
+            price_part = f"*{price}*"
+            if getattr(ad, "isPromotion", False):
+                price_part += " 🢁"
+            parts.append(price_part)
+
+        if title:
+            parts.append(f"[{title}]({short_url})")
+
+        if seller:
+            parts.append(f"Продавец: {seller}")
+
+        message = "\n".join(parts)
         return message

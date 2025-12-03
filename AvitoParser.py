@@ -75,6 +75,7 @@ def main(page: ft.Page):
         one_file_for_link.value = config.one_file_for_link
         parse_views.value = config.parse_views
         save_xlsx.value = config.save_xlsx
+        use_webdriver.value = config.use_webdriver
 
         page.update()
 
@@ -109,6 +110,7 @@ def main(page: ft.Page):
             "one_file_for_link": one_file_for_link.value,
             "parse_views": parse_views.value,
             "save_xlsx": save_xlsx.value,
+            "use_webdriver": use_webdriver.value,
         }}
 
         save_avito_config(config)
@@ -332,6 +334,10 @@ def main(page: ft.Page):
     save_xlsx = ft.Checkbox(label="Сохранять в Excel", value=True,
                               tooltip=SAVE_XLSX_HELP)
 
+    use_webdriver = ft.Checkbox(label="Использовать браузер", value=True,
+                            tooltip=USE_WEBDRIVER_HELP)
+
+
     input_fields = ft.Column(
         [
             label_required,
@@ -383,7 +389,7 @@ def main(page: ft.Page):
                 spacing=0
             ),
             ft.Row(
-                [one_file_for_link, parse_views, save_xlsx],
+                [parse_views, save_xlsx, use_webdriver],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),

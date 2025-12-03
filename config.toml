@@ -24,4 +24,6 @@ ignore_reserv = false
 ignore_promotion = false
 one_time_start = false
 one_file_for_link = false
+parse_views = false
 save_xlsx = true
+use_webdriver = true
