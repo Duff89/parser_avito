@@ -135,7 +135,7 @@ class AvitoParse:
 
                 if response.status_code >= 500:
                     raise requests.RequestsError(f"Ошибка сервера: {response.status_code}")
-                if response.status_code == [302, 403, 429]:
+                if response.status_code in [302, 403, 429]:
                     self.bad_request_count += 1
                     self.session = requests.Session()
                     if attempt >= 3:
@@ -166,7 +166,7 @@ class AvitoParse:
                 if self.stop_event and self.stop_event.is_set():
                     return
                 if DEBUG_MODE:
-                    html_code = open("response.txt", "r", encoding="utf-8").read()
+                    html_code = open("december.txt", "r", encoding="utf-8").read()
                 else:
                     html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
 
