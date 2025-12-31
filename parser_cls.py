@@ -168,7 +168,8 @@ class AvitoParse:
                 if DEBUG_MODE:
                     html_code = open("december.txt", "r", encoding="utf-8").read()
                 else:
-                    html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
+                    client = AvitoParse(self.config)
+                    html_code = client.fetch_data(url=url)
 
                 if not html_code:
                     logger.warning(
