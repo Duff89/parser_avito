@@ -1,0 +1,14 @@
+services:
+  parser_avito:
+    container_name: avito
+    image: localhost/parser_avito:latest
+      #build:
+      #  context: .
+      #  dockerfile: Dockerfile
+        #tags:
+        #  - localhost/parser_avito:latest
+    restart: always
+    volumes:
+       - $PWD/config.toml:/app/config.toml:ro
+       - $PWD/cookies.json:/app/cookies.json:ro
+       - $PWD/result:/app/result
