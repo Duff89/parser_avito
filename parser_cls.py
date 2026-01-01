@@ -17,6 +17,8 @@ from common_data import HEADERS
 from db_service import SQLiteDBHandler
 from dto import Proxy, AvitoConfig
 from get_cookies import get_cookies
+from get_cookies import get_html
+from get_cookies import PlaywrightClient
 from hide_private_data import log_config
 from load_config import load_avito_config
 from models import ItemsResponse, Item
@@ -168,7 +170,7 @@ class AvitoParse:
                 if DEBUG_MODE:
                     html_code = open("december.txt", "r", encoding="utf-8").read()
                 else:
-                    html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
+                    html_code = asyncio.run(get_html(proxy=None, url=url, headless=True, stop_event=None))
 
                 if not html_code:
                     logger.warning(
