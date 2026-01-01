@@ -11,9 +11,20 @@ def ensure_playwright_installed(browser: str = "chromium"):
     """
     try:
         # === Указываем правильный путь к браузерам ===
-        ms_playwright_dir = os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "ms-playwright"
-        )
+        platform = os.uname().sysname
+        if platform == 'Windows':
+          ms_playwright_dir = os.path.join(
+              os.path.expanduser("~"), "AppData", "Local", "ms-playwright"
+          )
+        elif platform == 'Linux':
+            ms_playwright_dir = os.path.join(
+                os.path.expanduser("~"), ".cache", "ms-playwright"
+            )
+        elif  platform == 'Darwin':
+          ms_playwright_dir = os.path.join(
+              os.path.expanduser("~"), "Library", "Caches", "ms-playwright"
+          )
+
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = ms_playwright_dir
 
         from playwright._impl._driver import compute_driver_executable
