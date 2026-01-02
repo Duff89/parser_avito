@@ -151,29 +151,6 @@ class PlaywrightClient:
         logger.warning("Не удалось получить cookies")
         return {}
 
-    async def get_html(self, url: str):
-        try:
-            await self.launch_browser()
-            logger.debug("launched browser")
-            await self.page.goto(url=url,
-                                 timeout=60_000,
-                                 wait_until="domcontentloaded")
-        except Error as err:
-            logger.error(err.message)
-            await self.page.close()
-            await self.browser.close()
-
-        for attempt in range(10):
-            if self.stop_event and self.stop_event.is_set():
-                return {}
-            await self.check_block(self.page, self.context)
-            return await self.page.content()
-            await asyncio.sleep(5)
-
-        logger.warning("Не удалось получить cookies")
-        return {}
-
-
     async def extract_cookies(self, url: str) -> dict:
         try:
             await self.launch_browser()
@@ -254,12 +231,3 @@ async def get_cookies(proxy: Proxy = None, headless: bool = True, stop_event=Non
     ads_id = str(random.randint(1111111111, 9999999999))
     cookies = await client.get_cookies(f"https://www.avito.ru/{ads_id}")
     return cookies, client.user_agent
-
-async def get_html(proxy: Proxy = None, url: str = None, headless: bool = True, stop_event=None) -> str:
-    logger.info("Пытаюсь получить HTML")
-    client = PlaywrightClient(
-        proxy=proxy,
-        headless=headless,
-        stop_event=stop_event
-    )
-    return await client.get_html(url)
