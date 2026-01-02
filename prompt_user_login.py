@@ -3,9 +3,22 @@ from playwright.async_api import async_playwright, Playwright
 from loguru import logger
 from playwright_setup import ensure_playwright_installed
 
+from load_config import load_avito_config
+
 logger.add("logs/app.log", rotation="5 MB", retention="5 days", level="DEBUG")
 
 async def prompt_user_login(playwright: Playwright):
+    try:
+        config = load_avito_config("config.toml")
+    except Exception as err:
+        logger.error(f"Ошибка загрузки конфига: {err}")
+
+    if isinstance(config.playwright_state_file,str):
+        logger.info("Сессия будет сохранена в Playwright state file " + config.playwright_state_file)
+    else:
+        logger.error("Playwright state file не задан. Сессия не будет сохранён")
+        return
+
     ensure_playwright_installed("chromium")
     chromium = playwright.chromium
     launch_args = {
@@ -44,9 +57,9 @@ async def prompt_user_login(playwright: Playwright):
         logger.error("Браузер неожиданно закрыт. Сессия не будет сохранена")
         return
 
-    # Save storage state into the file.
+
     try:
-        state_file="state.json"
+        state_file=config.playwright_state_file
         storage = await context.storage_state(path=state_file)
         await context.close()
         logger.info("Сессия пользователя Авито сохранена в " + state_file)
