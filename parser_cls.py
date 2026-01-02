@@ -167,12 +167,12 @@ class AvitoParse:
             for i in range(0, self.config.count):
                 if self.stop_event and self.stop_event.is_set():
                     return
-                if DEBUG_MODE:
-                    html_code = open("december.txt", "r", encoding="utf-8").read()
-                else:
-                    html_code = asyncio.run(get_html(proxy=None, url=url, headless=True, stop_event=None))
-
-                if not html_code:
+                try:
+                    if DEBUG_MODE:
+                        html_code = open("december.txt", "r", encoding="utf-8").read()
+                    else:
+                        html_code = asyncio.run(get_html(proxy=None, url=url, headless=True, stop_event=None))
+                except:
                     logger.warning(
                         f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
                     time.sleep(self.config.pause_between_links)

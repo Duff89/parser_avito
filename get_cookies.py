@@ -5,6 +5,7 @@ from loguru import logger
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from typing import Optional, Dict, List
+from playwright.async_api import Error, TimeoutError
 
 from dto import Proxy, ProxySplit
 from playwright_setup import ensure_playwright_installed
@@ -151,10 +152,16 @@ class PlaywrightClient:
         return {}
 
     async def get_html(self, url: str):
-        await self.launch_browser()
-        await self.page.goto(url=url,
-                             timeout=60_000,
-                             wait_until="domcontentloaded")
+        try:
+            await self.launch_browser()
+            logger.debug("launched browser")
+            await self.page.goto(url=url,
+                                 timeout=60_000,
+                                 wait_until="domcontentloaded")
+        except Error as err:
+            logger.error(err.message)
+            await self.page.close()
+            await self.browser.close()
 
         for attempt in range(10):
             if self.stop_event and self.stop_event.is_set():
