@@ -56,3 +56,6 @@ async def prompt_user_login(playwright: Playwright):
 async def wrapper():
     async with async_playwright() as playwright:
         await prompt_user_login(playwright)
+
+if __name__ == "__main__":
+    asyncio.run(wrapper())
