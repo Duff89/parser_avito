@@ -2,6 +2,7 @@ import asyncio
 from playwright.async_api import async_playwright, Playwright
 from loguru import logger
 from playwright_setup import ensure_playwright_installed
+from pathlib import Path
 
 from load_config import load_avito_config
 
@@ -59,8 +60,10 @@ async def prompt_user_login(playwright: Playwright):
 
 
     try:
-        state_file=config.playwright_state_file
-        storage = await context.storage_state(path=state_file)
+        state_file = config.playwright_state_file
+        state_filepath = Path(state_file)
+        state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
+        storage = await context.storage_state(path=state_filepath)
         await context.close()
         logger.info("Сессия пользователя Авито сохранена в " + state_file)
     except:
