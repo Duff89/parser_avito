@@ -17,7 +17,7 @@ async def prompt_user_login(playwright: Playwright):
     if isinstance(config.playwright_state_file,str):
         logger.info("Сессия будет сохранена в Playwright state file " + config.playwright_state_file)
     else:
-        logger.error("Playwright state file не задан. Сессия не будет сохранён")
+        logger.error("Playwright state file не задан. Сессия не будет сохранена")
         return
 
     ensure_playwright_installed("chromium")
