@@ -35,7 +35,7 @@ def ensure_playwright_installed(browser: str = "chromium"):
         else:
             driver_path = result
 
-        browsers_exist = os.path.exists(driver_path) or os.path.exists(ms_playwright_dir)
+        browsers_exist = os.path.exists(driver_path) and os.path.exists(ms_playwright_dir)
 
         if not browsers_exist:
             logger.info(f"Playwright не найден. Устанавливаю {browser}...")
