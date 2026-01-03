@@ -488,11 +488,6 @@ class AvitoParse:
 
     async def get_html(proxy: Proxy = None, url: str = None, headless: bool = True, stop_event=None):
         async with async_playwright() as playwright:
-            try:
-                config = load_avito_config("config.toml")
-            except Exception as err:
-                logger.error(f"Ошибка загрузки конфига: {err}")
-
             ensure_playwright_installed("chromium")
             launch_args = {
                 "headless": headless,
