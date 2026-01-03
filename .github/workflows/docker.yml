@@ -6,10 +6,9 @@ on:
         type: string
         description: 'The tag to release'
         required: true
-  on:
-    push:
-      tags:
-        - v*.*.*
+  push:
+    tags:
+      - v*.*.*
 
 jobs:
   Build_parser_avito_docker:
