@@ -15,6 +15,7 @@ from requests.cookies import RequestsCookieJar
 from playwright_setup import ensure_playwright_installed
 from playwright.async_api import async_playwright, Playwright
 from playwright.async_api import Error, TimeoutError
+from pathlib import Path
 
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
@@ -575,6 +576,15 @@ class AvitoParse:
                 await page.close()
                 await context.close()
                 await browser.close()
+
+            try:
+                state_file = config.playwright_state_file
+                state_filepath = Path(state_file)
+                state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
+                storage = await context.storage_state(path=state_filepath)
+                logger.info("Сессия пользователя Авито сохранена в " + state_file)
+            except:
+                logger.error("Не удалось записать сессию в файл " + state_file)
 
             return await page.content()
 
