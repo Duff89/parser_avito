@@ -31,5 +31,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 RUN python -m playwright install chromium-headless-shell
 
 COPY . /app
+COPY entrypoint.sh /
 
-CMD ["python", "parser_cls.py"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
