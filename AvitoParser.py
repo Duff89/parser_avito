@@ -290,14 +290,14 @@ def main(page: ft.Page):
                             tooltip=TG_TOKEN_HELP)
     tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько через Enter", width=400,
                               multiline=True, expand=True, text_size=12, height=70, tooltip=TG_CHAT_ID_HELP)
-    btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
+    btn_test_tg = ft.Button("Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
     proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
                          tooltip=PROXY_HELP)
     proxy_change_ip = ft.TextField(
         label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=***", width=400,
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
-    proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
+    proxy_btn_help = ft.Button("Подробнее про прокси", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
     geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=30,
                        tooltip=GEO_HELP)
@@ -313,16 +313,16 @@ def main(page: ft.Page):
     )
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
-                                 style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
-    console_widget = ft.Text(width=800, height=60, color=ft.colors.GREEN, value="", selectable=True,
+                                 style=ft.ButtonStyle(bgcolor=ft.Colors.RED_400), expand=True)
+    console_widget = ft.Text(width=800, height=60, color=ft.Colors.GREEN, value="", selectable=True,
                              expand=True)
 
     buy_me_coffe_btn = ft.TextButton("Продвинуть разработку",
                                      on_click=lambda e: page.launch_url(DONAT_LINK),
-                                     style=ft.ButtonStyle(color=ft.colors.GREEN_300), expand=True,
+                                     style=ft.ButtonStyle(color=ft.Colors.GREEN_300), expand=True,
                                      tooltip=BUY_ME_COFFE_BTN_HELP)
     report_issue_btn = ft.TextButton("Сообщить о проблеме", on_click=lambda e: page.launch_url(
-        "https://github.com/Duff89/parser_avito/issues"), style=ft.ButtonStyle(color=ft.colors.GREY), expand=True,
+        "https://github.com/Duff89/parser_avito/issues"), style=ft.ButtonStyle(color=ft.Colors.GREY), expand=True,
                                      tooltip=REPORT_ISSUE_BTN_HELP)
     ignore_ads_in_reserv = ft.Checkbox(label="Игнор-ть резервы", value=True, tooltip=IGNORE_RESERV_HELP)
     ignore_promote_ads = ft.Checkbox(label="Игнор-ть продвинутые", value=False)
