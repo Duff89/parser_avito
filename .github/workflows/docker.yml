@@ -1,4 +1,4 @@
-name: Build & Release the parser_avito docker image
+name: Build and Release AvitoParser docker image
 
 on:
   workflow_dispatch:
