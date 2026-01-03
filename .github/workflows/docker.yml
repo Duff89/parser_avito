@@ -2,11 +2,6 @@ name: Build & Release the parser_avito docker image
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        type: string
-        description: 'The tag to release'
-        required: true
   push:
     tags:
       - v*.*.*
@@ -31,14 +26,9 @@ jobs:
         id: prep
         shell: bash
         run: |
-          tag=${{ inputs.tag }}
-          if [ -z $tag ]; then
-            tag=$GITHUB_REF_NAME
-          fi
+          tag=$(echo $GITHUB_REF_NAME | sed 's/^v//')
           echo "Using this tag for image: $tag"
-          version=$(echo $tag | sed 's/^v//')
-          echo "VERSION=$version" >> $GITHUB_OUTPUT
-          echo "VERSION=$version" >> $GITHUB_ENV
+          echo "tag=$tag" >> $GITHUB_OUTPUT
       - name: Build and push
         uses: docker/build-push-action@v5.0.0
         with:
