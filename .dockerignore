@@ -1,7 +1,7 @@
 .secret.txt
 result/*
 logs/*
-assets/
+assets/*
 cookies.json
 state.json
 venv
