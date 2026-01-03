@@ -1,4 +1,5 @@
 FROM python:3.11-slim
+LABEL org.opencontainers.image.source=https://github.com/Duff89/parser_avito
 
 RUN apt-get update && apt-get install \
 -y --ignore-missing --no-install-recommends --no-install-suggests \
