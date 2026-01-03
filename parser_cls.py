@@ -20,7 +20,6 @@ from common_data import HEADERS
 from db_service import SQLiteDBHandler
 from dto import Proxy, ProxySplit, AvitoConfig
 from get_cookies import get_cookies
-from get_cookies import PlaywrightClient
 from hide_private_data import log_config
 from load_config import load_avito_config
 from models import ItemsResponse, Item
@@ -577,8 +576,6 @@ class AvitoParse:
                 await browser.close()
 
             return await page.content()
-            #await asyncio.sleep(5)
-
 
             logger.warning("Не удалось получить HTML")
             return {}
