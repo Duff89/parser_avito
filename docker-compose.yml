@@ -1,7 +1,7 @@
 services:
   parser_avito:
     container_name: avito
-    image: localhost/parser_avito:latest
+    image: ghcr.io/duff89/parser_avito:latest
       #build:
       #  context: .
       #  dockerfile: Dockerfile
@@ -10,5 +10,7 @@ services:
     restart: always
     volumes:
        - $PWD/config.toml:/app/config.toml:ro
-       - $PWD/cookies.json:/app/cookies.json:ro
-       - $PWD/result:/app/result
+       - $PWD/cookies.json:/app/cookies.json:Z
+       - $PWD/result:/app/result:Z
+       - $PWD/database.db:/app/database.db:Z
+       #- $PWD/state.json:/app/state.json:Z
