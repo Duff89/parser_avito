@@ -10,6 +10,7 @@ from lang import *
 from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
 from tg_sender import SendAdToTg
+from vk_sender import SendAdToVK
 from version import VERSION
 
 
@@ -56,6 +57,8 @@ def main(page: ft.Page):
         url_input.value = "\n".join(config.urls or [])
         tg_chat_id.value = "\n".join(config.tg_chat_id or [])
         tg_token.value = config.tg_token or ""
+        vk_token.value = config.vk_token or ""
+        vk_user_id.value = "\n".join(config.vk_user_id or [])
         count_page.value = str(config.count)
         keys_word_white_list.value = "\n".join(config.keys_word_white_list or [])
         keys_word_black_list.value = "\n".join(config.keys_word_black_list or [])
@@ -90,6 +93,8 @@ def main(page: ft.Page):
         config = {"avito": {
             "tg_token": tg_token.value or "",
             "tg_chat_id": tg_chat_id.value.splitlines() if tg_chat_id.value else [],
+            "vk_token": vk_token.value or "",
+            "vk_user_id": vk_user_id.value.splitlines() if vk_user_id.value else [],
             "urls": url_input.value.splitlines() if url_input.value else [],
             "count": to_int_safe(count_page.value, 1),
             "keys_word_white_list": keys_word_white_list.value.splitlines() if keys_word_white_list.value else [],
@@ -139,6 +144,19 @@ def main(page: ft.Page):
             ).send_to_tg(msg="Это тестовое сообщение")
             return
         logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
+
+    def vk_log_test(e):
+        """Тестирование отправки сообщения в VK"""
+        logger.info("Сейчас будет проверка данных VK")
+        token = vk_token.value
+        user_id = vk_user_id.value
+        if all([token, user_id]):
+            SendAdToVK(
+                vk_token=token,
+                user_id=user_id.splitlines()
+            ).send_to_vk(msg="Это тестовое сообщение от парсера Avito")
+            return
+        logger.info("Должны быть заполнены поля ТОКЕН VK и USER ID VK")
 
     dlg_modal_proxy = ft.AlertDialog(
         modal=True,
@@ -292,6 +310,13 @@ def main(page: ft.Page):
                               multiline=True, expand=True, text_size=12, height=70, tooltip=TG_CHAT_ID_HELP)
     btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
+    vk_token = ft.TextField(label="Token VK (сообщества)", width=400, text_size=12, height=70, expand=True,
+                            tooltip="Токен доступа VK API от имени сообщества")
+    vk_user_id = ft.TextField(label="User ID VK (username). Можно несколько через Enter", width=400,
+                              multiline=True, expand=True, text_size=12, height=70,
+                              tooltip="Username или ID пользователей VK для отправки сообщений")
+    btn_test_vk = ft.ElevatedButton(text="Проверить VK", disabled=False, on_click=vk_log_test, expand=True,
+                                    tooltip="Отправить тестовое сообщение в VK")
     proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
                          tooltip=PROXY_HELP)
     proxy_change_ip = ft.TextField(
@@ -377,6 +402,12 @@ def main(page: ft.Page):
                 spacing=0
             ),
             btn_test_tg,
+            ft.Row(
+                [vk_token, vk_user_id],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
+            btn_test_vk,
             ft.Row(
                 [proxy, proxy_change_ip],
                 alignment=ft.MainAxisAlignment.CENTER,
