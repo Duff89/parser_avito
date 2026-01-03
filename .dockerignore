@@ -1,0 +1,12 @@
+.secret.txt
+result/*
+logs/*
+assets/
+cookies.json
+state.json
+venv
+__pycache__
+*.bak
+*.bat
+database.db
+december.txt
