@@ -568,11 +568,23 @@ class AvitoParse:
                     browser = await chromium.launch(**launch_args)
                     context = await browser.new_context(**context_args)
                     page = await context.new_page()
-                    await page.goto(url=url,
+                    response = await page.goto(url=url,
                                          timeout=60_000,
                                          wait_until="domcontentloaded")
+                    if response.status in [302, 403, 429]:
+                        self.bad_request_count += 1
+                        self.change_ip()
+                        raise requests.RequestsError(f"Слишком много запросов: {response.status}")
+                    elif response.status >= 500:
+                        raise requests.RequestsError(f"Ошибка сервера: {response.status}")
+                        self.bad_request_count += 1
+                    elif response >= 400:
+                        raise requests.RequestsError(f"Ошибка клиента: {response.status}")
+                        self.bad_request_count += 1
+
             except Error as err:
                 logger.error(err.message)
+                self.bad_request_count += 1
                 await page.close()
                 await context.close()
                 await browser.close()
