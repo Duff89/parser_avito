@@ -76,6 +76,7 @@ def main(page: ft.Page):
         parse_views.value = config.parse_views
         save_xlsx.value = config.save_xlsx
         use_webdriver.value = config.use_webdriver
+        playwright_state_file.value = config.playwright_state_file
 
         page.update()
 
@@ -111,6 +112,7 @@ def main(page: ft.Page):
             "parse_views": parse_views.value,
             "save_xlsx": save_xlsx.value,
             "use_webdriver": use_webdriver.value,
+            "playwright_state_file": playwright_state_file.value,
         }}
 
         save_avito_config(config)
@@ -336,7 +338,8 @@ def main(page: ft.Page):
 
     use_webdriver = ft.Checkbox(label="Использовать браузер", value=True,
                             tooltip=USE_WEBDRIVER_HELP)
-
+    playwright_state_file = ft.TextField(label="Файл сессии Авито", width=400, expand=True, text_size=12, height=50,
+                       tooltip=PLAYWRIGHT_STATE_FILE_HELP)
 
     input_fields = ft.Column(
         [
@@ -370,7 +373,11 @@ def main(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
-            seller_black_list,
+            ft.Row(
+                [seller_black_list, playwright_state_file],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0
+            ),
             ft.Row(
                 [tg_token, tg_chat_id],
                 alignment=ft.MainAxisAlignment.CENTER,
