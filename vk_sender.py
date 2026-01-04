@@ -161,9 +161,8 @@ class SendAdToVK:
                 if attachment:
                     payload["attachment"] = attachment
 
-                logger.debug(f"VK payload: {payload}")
+                logger.info(payload)
                 response = requests.post(self.api_url, headers=headers, data=payload)
-                logger.debug(f"VK response: {response.status_code} - {response.text}")
 
                 if response.status_code != 200:
                     logger.warning("Не удалось отправить сообщение. Проверьте правильность введенных данных")
@@ -175,12 +174,6 @@ class SendAdToVK:
                     error_code = body["error"].get("error_code", 0)
                     logger.warning(f"VK API error {error_code}: {error_msg}")
 
-                    # Flood control - ждём дольше
-                    if error_code == 9:
-                        logger.info("VK Flood control: ожидание 10 секунд...")
-                        time.sleep(10)
-                        if attempt < self.max_retries:
-                            continue
 
                     if attempt < self.max_retries:
                         time.sleep(self.retry_delay)
@@ -198,7 +191,5 @@ class SendAdToVK:
                     logger.debug("Не удалось отправить сообщение после всех попыток.")
 
     def send_to_vk(self, ad: Item = None, msg: str = None):
-        logger.debug(f"VK: начинаю отправку для {len(self.user_id)} получателей")
         for user_id in self.user_id:
             self.__send_to_vk(user_id=user_id, ad=ad, msg=msg)
-            time.sleep(1)  # Пауза между сообщениями для избежания flood control

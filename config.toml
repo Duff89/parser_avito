@@ -1,12 +1,8 @@
 [avito]
 tg_token = ""
-tg_chat_id = [
-    "",
-]
+tg_chat_id = []
 vk_token = ""
-vk_user_id = [
-    "",
-]
+vk_user_id = []
 urls = [
     "https://www.avito.ru/all/telefony/mobilnye_telefony/apple/iphone_11-ASgBAgICA0SywA2kmzm0wA3OqzmwwQ2I_Dc?cd=1&f=ASgBAQECA0SywA2kmzm0wA3OqzmwwQ2I_DcBQOjrDkT~_dsC_P3bAvr92wL4_dsCAUXGmgwUeyJmcm9tIjowLCJ0byI6OTAwMH0&s=104&user=1",
 ]
