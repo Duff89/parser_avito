@@ -578,7 +578,7 @@ class AvitoParse:
                     elif response.status >= 500:
                         raise requests.RequestsError(f"Ошибка сервера: {response.status}")
                         self.bad_request_count += 1
-                    elif response >= 400:
+                    elif response.status >= 400:
                         raise requests.RequestsError(f"Ошибка клиента: {response.status}")
                         self.bad_request_count += 1
 
