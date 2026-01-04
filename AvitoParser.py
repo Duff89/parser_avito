@@ -185,6 +185,10 @@ def main(page: ft.Page):
         stop_btn.visible = True
         is_run = True
         page.update()
+
+        threading.Thread(target=run_parser, daemon=True).start()
+
+    def run_parser():
         while is_run and not stop_event.is_set():
             run_process()
             if not is_run:
