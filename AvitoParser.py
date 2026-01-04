@@ -1,6 +1,7 @@
 import threading
 import time
 from pathlib import Path
+import prompt_user_login
 
 import flet as ft
 import tkinter as tk
@@ -166,6 +167,9 @@ def main(page: ft.Page):
         page.overlay.append(dlg_modal_proxy)
         dlg_modal_proxy.open = True
         page.update()
+
+    async def btn_prompt_user_login_handler(e):
+        await prompt_user_login.wrapper()
 
     def start_parser(e):
         nonlocal is_run
@@ -340,6 +344,8 @@ def main(page: ft.Page):
                             tooltip=USE_WEBDRIVER_HELP)
     playwright_state_file = ft.TextField(label="Файл сессии Авито", width=400, expand=True, text_size=12, height=50,
                        tooltip=PLAYWRIGHT_STATE_FILE_HELP)
+    btn_prompt_user_login = ft.Button("Войти в аккаунт Авито", on_click=btn_prompt_user_login_handler, expand=True,
+                                     tooltip=PROMPT_USER_LOGIN_HELP)
 
     input_fields = ft.Column(
         [
@@ -378,6 +384,7 @@ def main(page: ft.Page):
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=0
             ),
+            btn_prompt_user_login,
             ft.Row(
                 [tg_token, tg_chat_id],
                 alignment=ft.MainAxisAlignment.CENTER,
