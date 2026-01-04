@@ -445,7 +445,4 @@ def main(page: ft.Page):
     logger_console_init()
 
 
-ft.app(
-    target=main,
-    assets_dir="assets",
-)
+ft.run(main, assets_dir="assets")
