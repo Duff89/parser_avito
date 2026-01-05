@@ -6,7 +6,6 @@ from loguru import logger
 
 from models import Item
 
-
 class SendAdToTg:
     def __init__(self, bot_token: str, chat_id: list, max_retries: int = 5, retry_delay: int = 5):
         self.bot_token = bot_token
@@ -22,6 +21,53 @@ class SendAdToTg:
             return ""
         text = str(text).replace("\xa0", " ")
         return re.sub(r'([_\[\]()~`>#+\-=|{}.!])', r'\\\1', text)
+
+    @staticmethod
+    def get_first_image(ad: Item):
+        def get_largest_image_url(img):
+            best_key = max(
+                img.root.keys(),
+                key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
+            )
+            return str(img.root[best_key])
+
+        images_urls = [get_largest_image_url(img) for img in ad.images]
+        if images_urls:
+            return images_urls[0]
+
+    @staticmethod
+    def format_ad(ad: Item) -> str:
+        def esc(text: str) -> str:
+            if not text:
+                return ""
+            s = str(text).replace("\xa0", " ")
+            return re.sub(r'([_\[\]()~`>#+\-=|{}.!])', r'\\\1', s)
+
+        price = esc(getattr(ad, "priceDetailed", {}).get("value", "") if isinstance(getattr(ad, "priceDetailed", None),
+                                                                                    dict) else getattr(ad.priceDetailed,
+                                                                                                       "value",
+                                                                                                       getattr(ad,
+                                                                                                               "priceDetailed",
+                                                                                                               "")))
+        title = esc(getattr(ad, "title", ""))
+        short_url = f"https://avito.ru/{getattr(ad, 'id', '')}"
+        seller = esc(str(getattr(ad, "sellerId", ""))) if getattr(ad, "sellerId", None) else ""
+
+        parts = []
+        if price:
+            price_part = f"*{price}*"
+            if getattr(ad, "isPromotion", False):
+                price_part += " 🢁"
+            parts.append(price_part)
+
+        if title:
+            parts.append(f"[{title}]({short_url})")
+
+        if seller:
+            parts.append(f"Продавец: {seller}")
+
+        message = "\n".join(parts)
+        return message
 
     def __send_to_tg(self, chat_id: str | int, ad: Item = None, msg: str = None):
         if msg:
@@ -65,51 +111,3 @@ class SendAdToTg:
     def send_to_tg(self, ad: Item = None, msg: str = None):
         for chat_id in self.chat_id:
             self.__send_to_tg(chat_id=chat_id, ad=ad, msg=msg)
-
-    @staticmethod
-    def get_first_image(ad: Item):
-        def get_largest_image_url(img):
-            best_key = max(
-                img.root.keys(),
-                key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
-            )
-            return str(img.root[best_key])
-
-        images_urls = [get_largest_image_url(img) for img in ad.images]
-        if images_urls:
-            return images_urls[0]
-
-
-    @staticmethod
-    def format_ad(ad: Item) -> str:
-        def esc(text: str) -> str:
-            if not text:
-                return ""
-            s = str(text).replace("\xa0", " ")
-            return re.sub(r'([_\[\]()~`>#+\-=|{}.!])', r'\\\1', s)
-
-        price = esc(getattr(ad, "priceDetailed", {}).get("value", "") if isinstance(getattr(ad, "priceDetailed", None),
-                                                                                    dict) else getattr(ad.priceDetailed,
-                                                                                                       "value",
-                                                                                                       getattr(ad,
-                                                                                                               "priceDetailed",
-                                                                                                               "")))
-        title = esc(getattr(ad, "title", ""))
-        short_url = f"https://avito.ru/{getattr(ad, 'id', '')}"
-        seller = esc(str(getattr(ad, "sellerId", ""))) if getattr(ad, "sellerId", None) else ""
-
-        parts = []
-        if price:
-            price_part = f"*{price}*"
-            if getattr(ad, "isPromotion", False):
-                price_part += " 🢁"
-            parts.append(price_part)
-
-        if title:
-            parts.append(f"[{title}]({short_url})")
-
-        if seller:
-            parts.append(f"Продавец: {seller}")
-
-        message = "\n".join(parts)
-        return message

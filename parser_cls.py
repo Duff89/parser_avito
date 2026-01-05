@@ -21,6 +21,7 @@ from hide_private_data import log_config
 from load_config import load_avito_config
 from models import ItemsResponse, Item
 from tg_sender import SendAdToTg
+from vk_sender import SendAdToVK
 from version import VERSION
 from xlsx_service import XLSXHandler
 
@@ -39,6 +40,7 @@ class AvitoParse:
         self.proxy_obj = self.get_proxy_obj()
         self.db_handler = SQLiteDBHandler()
         self.tg_handler = self.get_tg_handler()
+        self.vk_handler = self.get_vk_handler()
         self.xlsx_handler = XLSXHandler(self.__get_file_title())
         self.stop_event = stop_event
         self.cookies = None
@@ -57,6 +59,19 @@ class AvitoParse:
     def _send_to_tg(self, ads: list[Item]) -> None:
         for ad in ads:
             self.tg_handler.send_to_tg(ad=ad)
+
+    def get_vk_handler(self) -> SendAdToVK | None:
+        if all([self.config.vk_token, self.config.vk_user_id]):
+            logger.info("VK handler инициализирован")
+            return SendAdToVK(vk_token=self.config.vk_token, user_id=self.config.vk_user_id)
+        logger.debug("VK handler не создан: vk_token или vk_user_id не заданы в конфиге")
+        return None
+
+    def _send_to_vk(self, ads: list[Item]) -> None:
+        logger.debug(f"VK: отправляю {len(ads)} объявлений")
+        for ad in ads:
+            self.vk_handler.send_to_vk(ad=ad)
+            time.sleep(1)  # Пауза между сообщениями для VK
 
     def get_proxy_obj(self) -> Proxy | None:
         if all([self.config.proxy_string, self.config.proxy_change_url]):
@@ -114,7 +129,7 @@ class AvitoParse:
         proxy_data = None
         if self.proxy_obj:
             proxy_data = {
-                          "https": f"http://{self.config.proxy_string}"
+                "https": f"http://{self.config.proxy_string}"
             }
 
         for attempt in range(1, retries + 1):
@@ -200,6 +215,9 @@ class AvitoParse:
                 if self.tg_handler and not self.config.one_time_start:
                     self._send_to_tg(ads=filter_ads)
 
+                if self.vk_handler and not self.config.one_time_start:
+                    self._send_to_vk(ads=filter_ads)
+
                 filter_ads = self.parse_views(ads=filter_ads)
 
                 if filter_ads:
@@ -226,6 +244,10 @@ class AvitoParse:
 
         if self.config.one_time_start and self.tg_handler:
             self.tg_handler.send_to_tg(msg="Парсинг Авито завершён. Все ссылки обработаны")
+            self.stop_event = True
+
+        if self.config.one_time_start and self.vk_handler:
+            self.vk_handler.send_to_vk(msg="Парсинг Авито завершён. Все ссылки обработаны")
             self.stop_event = True
 
     @staticmethod
