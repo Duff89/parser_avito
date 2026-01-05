@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import os
+import platform
 from loguru import logger
 
 
@@ -11,16 +12,15 @@ def ensure_playwright_installed(browser: str = "chromium"):
     """
     try:
         # === Указываем правильный путь к браузерам ===
-        platform = os.uname().sysname
-        if platform == 'Windows':
+        if platform.system() == 'Windows':
           ms_playwright_dir = os.path.join(
               os.path.expanduser("~"), "AppData", "Local", "ms-playwright"
           )
-        elif platform == 'Linux':
+        elif platform.system() == 'Linux':
             ms_playwright_dir = os.path.join(
                 os.path.expanduser("~"), ".cache", "ms-playwright"
             )
-        elif  platform == 'Darwin':
+        elif platform.system() == 'Darwin':
           ms_playwright_dir = os.path.join(
               os.path.expanduser("~"), "Library", "Caches", "ms-playwright"
           )
