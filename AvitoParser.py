@@ -1,9 +1,9 @@
 import threading
 import time
+import sys
 from pathlib import Path
 
 import flet as ft
-import tkinter as tk
 from loguru import logger
 
 from lang import *
@@ -16,12 +16,25 @@ from version import VERSION
 def get_screen_size() -> tuple:
     """Возвращает размеры основного экрана (ширина, высота)"""
     try:
-        root = tk.Tk()
-        root.withdraw()
-        width = root.winfo_screenwidth()
-        height = root.winfo_screenheight()
-        root.destroy()
-        return width, height
+        # На macOS используем AppKit вместо Tkinter (безопасно для потоков)
+        if sys.platform == "darwin":
+            try:
+                from AppKit import NSScreen
+                screen = NSScreen.mainScreen()
+                frame = screen.frame()
+                return int(frame.size.width), int(frame.size.height)
+            except ImportError:
+                pass
+        # На Windows используем ctypes
+        elif sys.platform == "win32":
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+            except Exception:
+                pass
+        # Fallback: используем значения по умолчанию
+        return 1920, 1080
     except Exception as e:
         logger.error(f"Не удалось получить размер экрана: {e}")
         return 1920, 1080
