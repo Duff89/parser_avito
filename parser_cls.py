@@ -12,10 +12,14 @@ from curl_cffi import requests
 from loguru import logger
 from pydantic import ValidationError
 from requests.cookies import RequestsCookieJar
+from playwright_setup import ensure_playwright_installed
+from playwright.async_api import async_playwright, Playwright
+from playwright.async_api import Error, TimeoutError
+from pathlib import Path
 
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
-from dto import Proxy, AvitoConfig
+from dto import Proxy, ProxySplit, AvitoConfig
 from get_cookies import get_cookies
 from hide_private_data import log_config
 from load_config import load_avito_config
@@ -37,6 +41,7 @@ class AvitoParse:
     ):
         self.config = config
         self.proxy_obj = self.get_proxy_obj()
+        self.proxy_split_obj = self.get_proxy_split_obj()
         self.db_handler = SQLiteDBHandler()
         self.tg_handler = self.get_tg_handler()
         self.xlsx_handler = XLSXHandler(self.__get_file_title())
@@ -66,6 +71,47 @@ class AvitoParse:
             )
         logger.info("Работаем без прокси")
         return None
+
+    @staticmethod
+    def check_protocol(ip_port: str) -> str:
+        if "http://" not in ip_port:
+            return f"http://{ip_port}"
+        return ip_port
+
+    @staticmethod
+    def del_protocol(proxy_string: str):
+        if "//" in proxy_string:
+            return proxy_string.split("//")[1]
+        return proxy_string
+
+    def get_proxy_split_obj(self) -> ProxySplit | None:
+        if not self.proxy_obj:
+            return None
+        try:
+            self.proxy_obj.proxy_string = self.del_protocol(proxy_string=self.proxy_obj.proxy_string)
+            if "@" in self.proxy_obj.proxy_string:
+                ip_port, user_pass = self.proxy_obj.proxy_string.split("@")
+                if "." in user_pass:
+                    ip_port, user_pass = user_pass, ip_port
+                login, password = str(user_pass).split(":")
+            else:
+                login, password, ip, port = self.proxy_obj.proxy_string.split(":")
+                if "." in login:
+                    login, password, ip, port = ip, port, login, password
+                ip_port = f"{ip}:{port}"
+
+            ip_port = self.check_protocol(ip_port=ip_port)
+
+            return ProxySplit(
+                ip_port=ip_port,
+                login=login,
+                password=password,
+                change_ip_link=self.proxy_obj.change_ip_link
+            )
+        except Exception as err:
+            logger.error(err)
+            logger.critical("Прокси в таком формате не поддерживаются. "
+                            "Используй: ip:port@user:pass или ip:port:user:pass")
 
     def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
         if not self.config.use_webdriver:
@@ -165,12 +211,12 @@ class AvitoParse:
             for i in range(0, self.config.count):
                 if self.stop_event and self.stop_event.is_set():
                     return
-                if DEBUG_MODE:
-                    html_code = open("december.txt", "r", encoding="utf-8").read()
-                else:
-                    html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
-
-                if not html_code:
+                try:
+                    if DEBUG_MODE:
+                        html_code = open("december.txt", "r", encoding="utf-8").read()
+                    else:
+                        html_code = asyncio.run(self.get_html(url=url, headless=True))
+                except Error as err:
                     logger.warning(
                         f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
                     time.sleep(self.config.pause_between_links)
@@ -381,8 +427,9 @@ class AvitoParse:
 
         for ad in ads:
             try:
-                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
+                html_code_full_page = asyncio.run(self.get_html(url=f"https://www.avito.ru{ad.urlPath}", headless=True))
                 ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
+                logger.debug(f"Получены просмотры для {ad.id}")
                 delay = random.uniform(0.1, 0.9)
                 time.sleep(delay)
             except Exception as err:
@@ -482,6 +529,102 @@ class AvitoParse:
         except Exception as err:
             logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
 
+    def is_avito_account_logged_in(self) -> bool:
+        if isinstance(self.config.playwright_state_file,str):
+            try:
+                with open(self.config.playwright_state_file, "r") as f:
+                    state_file = json.load(f)
+                    cookies_list = state_file["cookies"]
+                    for cookie in cookies_list:
+                        # sessid contains avito account session and should be present only after logging in
+                        if cookie["name"] == "sessid":
+                            return True
+            except:
+                logger.warning(f"Не удалось загрузить JSON из Playwright state file: {self.config.playwright_state_file}")
+                return False
+        else:
+            return False
+
+
+    async def get_html(self, url: str = None, headless: bool = True):
+        async with async_playwright() as playwright:
+            ensure_playwright_installed("chromium")
+            launch_args = {
+                "headless": headless,
+                "chromium_sandbox": False,
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--start-maximized",
+                    "--window-size=1920,1080",
+                ]
+            }
+            context_args = {
+                "viewport": {"width": 1920, "height": 1080},
+                "screen": {"width": 1920, "height": 1080},
+                "device_scale_factor": 1,
+                "is_mobile": False,
+                "has_touch": False,
+            }
+            if isinstance(self.config.playwright_state_file,str):
+                context_args["storage_state"] = self.config.playwright_state_file
+                logger.debug(f"Используем Playwright state file {self.config.playwright_state_file}")
+                if self.is_avito_account_logged_in():
+                    logger.info(f"Используем аккаунт Авито")
+                else:
+                    logger.warning(f"Аккаунт Авито не обнаружен, хотя настроен Playwright state file: {self.config.playwright_state_file}. Войдите в аккаунт через prompt_user_login.py или кнопку \"Войти в аккаунт Авито\"")
+            else:
+                logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
+
+            if self.proxy_split_obj:
+                context_args["proxy"] = {
+                    "server": self.proxy_split_obj.ip_port,
+                    "username": self.proxy_split_obj.login,
+                    "password": self.proxy_split_obj.password
+                }
+
+            try:
+                    chromium = playwright.chromium
+                    browser = await chromium.launch(**launch_args)
+                    context = await browser.new_context(**context_args)
+                    page = await context.new_page()
+                    response = await page.goto(url=url,
+                                         timeout=60_000,
+                                         wait_until="domcontentloaded")
+                    if response.status in [302, 403, 429]:
+                        self.bad_request_count += 1
+                        self.change_ip()
+                        raise requests.RequestsError(f"Слишком много запросов: {response.status}. Включите прокси либо войдите в аккаунт Авито")
+                    elif response.status >= 500:
+                        raise requests.RequestsError(f"Ошибка сервера: {response.status}")
+                        self.bad_request_count += 1
+                    elif response.status >= 400:
+                        raise requests.RequestsError(f"Ошибка клиента: {response.status}")
+                        self.bad_request_count += 1
+
+            except Error as err:
+                logger.error(err.message)
+                self.bad_request_count += 1
+                await page.close()
+                await context.close()
+                await browser.close()
+                return
+
+            if isinstance(self.config.playwright_state_file,str):
+                try:
+                    state_file = self.config.playwright_state_file
+                    state_filepath = Path(state_file)
+                    state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
+                    storage = await context.storage_state(path=state_filepath)
+                    logger.debug(f"Playwright state сохранён в {state_file}")
+                except:
+                    logger.error(f"Не удалось записать сессию в файл {state_file}")
+
+            return await page.content()
+
+            logger.warning("Не удалось получить HTML")
+            return {}
 
 if __name__ == "__main__":
     try:

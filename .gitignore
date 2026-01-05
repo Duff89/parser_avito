@@ -1,2 +1,11 @@
-# created by virtualenv automatically
 .secret.txt
+result
+logs
+config.toml
+cookies.json
+state.json
+venv
+__pycache__
+*.bak
+database.db
+december.txt

@@ -5,9 +5,11 @@ from loguru import logger
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from typing import Optional, Dict, List
+from playwright.async_api import Error, TimeoutError
 
 from dto import Proxy, ProxySplit
 from playwright_setup import ensure_playwright_installed
+from load_config import load_avito_config
 
 MAX_RETRIES = 3
 RETRY_DELAY = 10
@@ -77,6 +79,12 @@ class PlaywrightClient:
 
     async def launch_browser(self):
         ensure_playwright_installed("chromium")
+
+        try:
+            config = load_avito_config("config.toml")
+        except Exception as err:
+            logger.error(f"Ошибка загрузки конфига: {err}")
+
         stealth = Stealth()
         self.playwright_context = stealth.use_async(async_playwright())
         playwright = await self.playwright_context.__aenter__()
@@ -104,6 +112,12 @@ class PlaywrightClient:
             "is_mobile": False,
             "has_touch": False,
         }
+
+        if isinstance(config.playwright_state_file,str):
+            context_args["storage_state"] = config.playwright_state_file
+            logger.debug(f"Используем Playwright state file {config.playwright_state_file}")
+        else:
+            logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
 
         if self.proxy_split_obj:
             context_args["proxy"] = {
