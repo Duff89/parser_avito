@@ -27,6 +27,8 @@ class AvitoConfig:
     count: int = 1
     tg_token: Optional[str] = None
     tg_chat_id: List[str] = None
+    vk_token: Optional[str] = None
+    vk_user_id: List[str] = None
     max_price: int = 999_999_999
     min_price: int = 0
     geo: Optional[str] = None
