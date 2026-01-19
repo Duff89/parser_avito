@@ -11,9 +11,9 @@ services:
         #  - localhost/parser_avito:latest
     restart: always
     volumes:
-       - $PWD/config.toml:/app/config.toml:ro
-       - $PWD/cookies.json:/app/cookies.json:Z
-       - $PWD/result:/app/result:Z
+       - ./config.toml:/app/config.toml:ro
+       - ./cookies.json:/app/cookies.json:Z
+       - ./result:/app/result:Z
        - type: bind
          source: database.db
          target: /app/database.db
