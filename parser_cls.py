@@ -596,11 +596,11 @@ class AvitoParse:
                         self.change_ip()
                         raise requests.RequestsError(f"Слишком много запросов: {response.status}. Включите прокси либо войдите в аккаунт Авито")
                     elif response.status >= 500:
+                        self.bad_request_count += 1
                         raise requests.RequestsError(f"Ошибка сервера: {response.status}")
-                        self.bad_request_count += 1
                     elif response.status >= 400:
-                        raise requests.RequestsError(f"Ошибка клиента: {response.status}")
                         self.bad_request_count += 1
+                        raise requests.RequestsError(f"Ошибка клиента: {response.status}")
 
             except Error as err:
                 logger.error(err.message)
@@ -620,10 +620,11 @@ class AvitoParse:
                 except:
                     logger.error(f"Не удалось записать сессию в файл {state_file}")
 
-            return await page.content()
-
-            logger.warning("Не удалось получить HTML")
-            return {}
+            if await page.content() is not None:
+                return await page.content()
+            else:
+                logger.warning("Не удалось получить HTML")
+                return {}
 
 if __name__ == "__main__":
     try:
