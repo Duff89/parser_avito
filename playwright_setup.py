@@ -24,6 +24,11 @@ def ensure_playwright_installed(browser: str = "chromium"):
           ms_playwright_dir = os.path.join(
               os.path.expanduser("~"), "Library", "Caches", "ms-playwright"
           )
+        else:
+           # Откатываемся на использование виндового пути если не удалось определить ОС для гарантированной инициализации ms_playwright_dir
+           ms_playwright_dir = os.path.join(
+              os.path.expanduser("~"), "AppData", "Local", "ms-playwright"
+          )
 
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = ms_playwright_dir
 
