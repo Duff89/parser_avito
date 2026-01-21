@@ -567,7 +567,7 @@ class AvitoParse:
                 "is_mobile": False,
                 "has_touch": False,
             }
-            if isinstance(self.config.playwright_state_file,str):
+            if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
                 context_args["storage_state"] = self.config.playwright_state_file
                 logger.debug(f"Используем Playwright state file {self.config.playwright_state_file}")
                 if self.is_avito_account_logged_in():
