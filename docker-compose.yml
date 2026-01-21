@@ -1,0 +1,23 @@
+# In case you use podman-compose - it's recommended to install it from github. See: https://github.com/containers/podman-compose/issues/1275
+
+services:
+  parser_avito:
+    container_name: avito
+    image: ghcr.io/duff89/parser_avito:latest
+      #build:
+      #  context: .
+      #  dockerfile: Dockerfile
+        #tags:
+        #  - localhost/parser_avito:latest
+    restart: always
+    volumes:
+       - ./config.toml:/app/config.toml:ro
+       - ./cookies.json:/app/cookies.json:Z
+       - ./result:/app/result:Z
+       - type: bind
+         source: database.db
+         target: /app/database.db
+         bind:
+           create_host_path: false
+           selinux: Z
+       #- $PWD/state.json:/app/state.json:Z
