@@ -592,7 +592,6 @@ class AvitoParse:
                 await page.close()
                 await context.close()
                 await browser.close()
-                return
 
             try:
                 state_file = config.playwright_state_file
