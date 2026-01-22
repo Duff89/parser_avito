@@ -570,10 +570,6 @@ class AvitoParse:
             if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
                 context_args["storage_state"] = self.config.playwright_state_file
                 logger.debug(f"Используем Playwright state file {self.config.playwright_state_file}")
-                if self.is_avito_account_logged_in():
-                    logger.info(f"Используем аккаунт Авито")
-                else:
-                    logger.warning(f"Аккаунт Авито не обнаружен, хотя настроен Playwright state file: {self.config.playwright_state_file}. Войдите в аккаунт через prompt_user_login.py или кнопку \"Войти в аккаунт Авито\"")
             else:
                 logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
             if self.proxy_split_obj:
