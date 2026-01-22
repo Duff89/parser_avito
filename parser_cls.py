@@ -567,9 +567,9 @@ class AvitoParse:
                 "is_mobile": False,
                 "has_touch": False,
             }
-            if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
-                context_args["storage_state"] = self.config.playwright_state_file
-                logger.debug(f"Используем Playwright state file {self.config.playwright_state_file}")
+            if isinstance(config.playwright_state_file,str):
+                context_args["storage_state"] = config.playwright_state_file
+                logger.debug("Используем Playwright state file " + config.playwright_state_file)
             else:
                 logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
             if self.proxy_split_obj:
@@ -600,9 +600,9 @@ class AvitoParse:
                     state_filepath = Path(state_file)
                     state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
                     storage = await context.storage_state(path=state_filepath)
-                    logger.info(f"Сессия пользователя Авито сохранена в {state_file}")
+                    logger.info("Сессия пользователя Авито сохранена в " + state_file)
                 except:
-                    logger.error(f"Не удалось записать сессию в файл {state_file}")
+                    logger.error("Не удалось записать сессию в файл " + state_file)
 
             return await page.content()
 
