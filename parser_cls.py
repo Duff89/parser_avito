@@ -18,7 +18,7 @@ from playwright.async_api import Error, TimeoutError
 
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
-from dto import Proxy, ProxySplit, AvitoConfig
+from dto import Proxy, AvitoConfig
 from get_cookies import get_cookies
 from hide_private_data import log_config
 from load_config import load_avito_config
@@ -40,7 +40,6 @@ class AvitoParse:
     ):
         self.config = config
         self.proxy_obj = self.get_proxy_obj()
-        self.proxy_split_obj = self.get_proxy_split_obj()
         self.db_handler = SQLiteDBHandler()
         self.tg_handler = self.get_tg_handler()
         self.xlsx_handler = XLSXHandler(self.__get_file_title())
@@ -70,47 +69,6 @@ class AvitoParse:
             )
         logger.info("Работаем без прокси")
         return None
-
-    @staticmethod
-    def check_protocol(ip_port: str) -> str:
-        if "http://" not in ip_port:
-            return f"http://{ip_port}"
-        return ip_port
-
-    @staticmethod
-    def del_protocol(proxy_string: str):
-        if "//" in proxy_string:
-            return proxy_string.split("//")[1]
-        return proxy_string
-
-    def get_proxy_split_obj(self) -> ProxySplit | None:
-        if not self.proxy_obj:
-            return None
-        try:
-            self.proxy_obj.proxy_string = self.del_protocol(proxy_string=self.proxy_obj.proxy_string)
-            if "@" in self.proxy_obj.proxy_string:
-                ip_port, user_pass = self.proxy_obj.proxy_string.split("@")
-                if "." in user_pass:
-                    ip_port, user_pass = user_pass, ip_port
-                login, password = str(user_pass).split(":")
-            else:
-                login, password, ip, port = self.proxy_obj.proxy_string.split(":")
-                if "." in login:
-                    login, password, ip, port = ip, port, login, password
-                ip_port = f"{ip}:{port}"
-
-            ip_port = self.check_protocol(ip_port=ip_port)
-
-            return ProxySplit(
-                ip_port=ip_port,
-                login=login,
-                password=password,
-                change_ip_link=self.proxy_obj.change_ip_link
-            )
-        except Exception as err:
-            logger.error(err)
-            logger.critical("Прокси в таком формате не поддерживаются. "
-                            "Используй: ip:port@user:pass или ip:port:user:pass")
 
     def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
         if not self.config.use_webdriver:
@@ -544,7 +502,7 @@ class AvitoParse:
             return False
 
 
-    async def get_html(self, url: str = None, headless: bool = True, stop_event=None):
+    async def get_html(proxy: Proxy = None, url: str = None, headless: bool = True, stop_event=None):
         async with async_playwright() as playwright:
             ensure_playwright_installed("chromium")
             launch_args = {
@@ -570,13 +528,6 @@ class AvitoParse:
                 logger.debug("Используем Playwright state file " + config.playwright_state_file)
             else:
                 logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
-            if self.proxy_split_obj:
-                context_args["proxy"] = {
-                    "server": self.proxy_split_obj.ip_port,
-                    "username": self.proxy_split_obj.login,
-                    "password": self.proxy_split_obj.password
-                }
-
             try:
                     chromium = playwright.chromium
                     browser = await chromium.launch(**launch_args)
