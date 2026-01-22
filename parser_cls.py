@@ -214,7 +214,7 @@ class AvitoParse:
                     if DEBUG_MODE:
                         html_code = open("december.txt", "r", encoding="utf-8").read()
                     else:
-                        html_code = asyncio.run(self.get_html(url=url, headless=True))
+                        html_code = asyncio.run(self.get_html(url=url, headless=True, stop_event=None))
                 except Error as err:
                     logger.warning(
                         f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
@@ -544,7 +544,7 @@ class AvitoParse:
             return False
 
 
-    async def get_html(self, url: str = None, headless: bool = True):
+    async def get_html(self, url: str = None, headless: bool = True, stop_event=None):
         async with async_playwright() as playwright:
             ensure_playwright_installed("chromium")
             launch_args = {
