@@ -15,7 +15,7 @@ async def prompt_user_login(playwright: Playwright):
         logger.error(f"Ошибка загрузки конфига: {err}")
 
     if isinstance(config.playwright_state_file,str):
-        logger.info("Сессия будет сохранена в Playwright state file " + config.playwright_state_file)
+        logger.info(f"Сессия будет сохранена в Playwright state file {config.playwright_state_file}")
     else:
         logger.error("Playwright state file не задан. Сессия не будет сохранена")
         return
@@ -65,9 +65,9 @@ async def prompt_user_login(playwright: Playwright):
         state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
         storage = await context.storage_state(path=state_filepath)
         await context.close()
-        logger.info("Сессия пользователя Авито сохранена в " + state_file)
+        logger.info(f"Сессия пользователя Авито сохранена в {state_file}")
     except:
-        logger.error("Не удалось записать сессию в файл " + state_file)
+        logger.error(f"Не удалось записать сессию в файл {state_file}")
 
 async def wrapper():
     async with async_playwright() as playwright:

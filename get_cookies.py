@@ -115,7 +115,7 @@ class PlaywrightClient:
 
         if isinstance(config.playwright_state_file,str):
             context_args["storage_state"] = config.playwright_state_file
-            logger.debug("Используем Playwright state file " + config.playwright_state_file)
+            logger.debug(f"Используем Playwright state file {config.playwright_state_file}")
         else:
             logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
 
