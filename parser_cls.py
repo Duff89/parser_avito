@@ -426,9 +426,8 @@ class AvitoParse:
 
         for ad in ads:
             try:
-                html_code_full_page = asyncio.run(self.get_html(url=f"https://www.avito.ru{ad.urlPath}", headless=True))
+                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
                 ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
-                logger.debug(f"Получены просмотры для {ad.id}")
                 delay = random.uniform(0.1, 0.9)
                 time.sleep(delay)
             except Exception as err:
