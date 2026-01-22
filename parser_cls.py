@@ -590,7 +590,7 @@ class AvitoParse:
                     if response.status in [302, 403, 429]:
                         self.bad_request_count += 1
                         self.change_ip()
-                        raise requests.RequestsError(f"Слишком много запросов: {response.status}. Включите прокси либо войдите в аккаунт Авито")
+                        raise requests.RequestsError(f"Слишком много запросов: {response.status}")
                     elif response.status >= 500:
                         raise requests.RequestsError(f"Ошибка сервера: {response.status}")
                         self.bad_request_count += 1
