@@ -12,14 +12,13 @@ from curl_cffi import requests
 from loguru import logger
 from pydantic import ValidationError
 from requests.cookies import RequestsCookieJar
-from playwright_setup import ensure_playwright_installed
-from playwright.async_api import async_playwright, Playwright
-from playwright.async_api import Error, TimeoutError
 
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
 from dto import Proxy, AvitoConfig
 from get_cookies import get_cookies
+from get_cookies import get_html
+from get_cookies import PlaywrightClient
 from hide_private_data import log_config
 from load_config import load_avito_config
 from models import ItemsResponse, Item
@@ -172,8 +171,8 @@ class AvitoParse:
                     if DEBUG_MODE:
                         html_code = open("december.txt", "r", encoding="utf-8").read()
                     else:
-                        html_code = asyncio.run(self.get_html(url=url, headless=True, stop_event=None))
-                except Error as err:
+                        html_code = asyncio.run(get_html(proxy=None, url=url, headless=True, stop_event=None))
+                except:
                     logger.warning(
                         f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
                     time.sleep(self.config.pause_between_links)
@@ -500,57 +499,6 @@ class AvitoParse:
                 return False
         else:
             return False
-
-
-    async def get_html(proxy: Proxy = None, url: str = None, headless: bool = True, stop_event=None):
-        async with async_playwright() as playwright:
-            try:
-                config = load_avito_config("config.toml")
-            except Exception as err:
-                logger.error(f"Ошибка загрузки конфига: {err}")
-
-            ensure_playwright_installed("chromium")
-            launch_args = {
-                "headless": headless,
-                "chromium_sandbox": False,
-                "args": [
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--start-maximized",
-                    "--window-size=1920,1080",
-                ]
-            }
-            context_args = {
-                "viewport": {"width": 1920, "height": 1080},
-                "screen": {"width": 1920, "height": 1080},
-                "device_scale_factor": 1,
-                "is_mobile": False,
-                "has_touch": False,
-            }
-            if isinstance(config.playwright_state_file,str):
-                context_args["storage_state"] = config.playwright_state_file
-                logger.debug("Используем Playwright state file " + config.playwright_state_file)
-            else:
-                logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
-            try:
-                    chromium = playwright.chromium
-                    browser = await chromium.launch(**launch_args)
-                    context = await browser.new_context(**context_args)
-                    page = await context.new_page()
-                    await page.goto(url=url,
-                                         timeout=60_000,
-                                         wait_until="domcontentloaded")
-            except Error as err:
-                logger.error(err.message)
-                await page.close()
-                await context.close()
-                await browser.close()
-
-            return await page.content()
-
-            logger.warning("Не удалось получить HTML")
-            return {}
 
 if __name__ == "__main__":
     try:
