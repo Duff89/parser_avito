@@ -483,7 +483,7 @@ class AvitoParse:
             logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
 
     def is_avito_account_logged_in(self) -> bool:
-        if isinstance(self.config.playwright_state_file,str):
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
             try:
                 with open(self.config.playwright_state_file, "r") as f:
                     state_file = json.load(f)
@@ -499,7 +499,7 @@ class AvitoParse:
             return False
 
     def get_sessid_from_playwright_state_file(self) -> str:
-        if isinstance(self.config.playwright_state_file,str):
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
             try:
                 with open(self.config.playwright_state_file, "r") as f:
                     state_file = json.load(f)
