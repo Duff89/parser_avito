@@ -498,6 +498,20 @@ class AvitoParse:
         else:
             return False
 
+    def get_sessid_from_playwright_state_file(self) -> str:
+        if isinstance(self.config.playwright_state_file,str):
+            try:
+                with open(self.config.playwright_state_file, "r") as f:
+                    state_file = json.load(f)
+                    cookies_list = state_file["cookies"]
+                    for cookie in cookies_list:
+                        # sessid contains avito account session and should be present only after logging in
+                        if cookie["name"] == "sessid":
+                            return cookie["name"]
+            except:
+                logger.warning(f"Не удалось загрузить JSON из Playwright state file: {self.config.playwright_state_file}")
+                return None
+
 if __name__ == "__main__":
     try:
         config = load_avito_config("config.toml")
