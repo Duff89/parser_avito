@@ -117,7 +117,7 @@ class AvitoParse:
             proxy_data = {
                           "https": f"http://{self.config.proxy_string}"
             }
-
+        self.load_cookies()
         for attempt in range(1, retries + 1):
             if self.stop_event and self.stop_event.is_set():
                 return
