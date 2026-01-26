@@ -106,6 +106,7 @@ class AvitoParse:
                 jar = RequestsCookieJar()
                 for k, v in cookies.items():
                     jar.set(k, v)
+                jar.set("sessid",self.get_sessid_from_playwright_state_file())
                 self.session.cookies.update(jar)
         except FileNotFoundError:
             pass
