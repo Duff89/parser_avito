@@ -507,7 +507,7 @@ class AvitoParse:
                     for cookie in cookies_list:
                         # sessid contains avito account session and should be present only after logging in
                         if cookie["name"] == "sessid":
-                            return cookie["name"]
+                            return cookie["value"]
             except:
                 logger.warning(f"Не удалось загрузить JSON из Playwright state file: {self.config.playwright_state_file}")
                 return None
