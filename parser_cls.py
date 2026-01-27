@@ -118,7 +118,12 @@ class AvitoParse:
             proxy_data = {
                           "https": f"http://{self.config.proxy_string}"
             }
-        self.load_cookies()
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
+            if self.is_sessid_cookie_present():
+                self.load_cookies()
+            elif self.is_avito_account_logged_in():
+                self.cookies = self.get_cookies()
+
         for attempt in range(1, retries + 1):
             if self.stop_event and self.stop_event.is_set():
                 return
