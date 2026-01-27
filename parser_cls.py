@@ -500,6 +500,19 @@ class AvitoParse:
         else:
             return False
 
+    def is_sessid_cookie_present(self) -> bool:
+        try:
+            with open("cookies.json", "r") as f:
+                cookies = json.load(f)
+                # sessid contains avito account session and should be present only after logging in
+                if cookies["sessid"]:
+                    return True
+                else:
+                    return False
+        except:
+            logger.warning(f"Не удалось загрузить JSON из cookies.json")
+            return False
+
     def get_sessid_from_playwright_state_file(self) -> str:
         if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
             try:
