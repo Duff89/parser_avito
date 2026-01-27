@@ -148,7 +148,7 @@ class AvitoParse:
                     if attempt >= 3:
                         self.cookies = self.get_cookies()
                     self.change_ip()
-                    raise requests.RequestsError(f"Слишком много запросов: {response.status_code}")
+                    raise requests.RequestsError(f"Слишком много запросов: {response.status_code}. Включите прокси либо войдите в аккаунт Авито")
 
                 self.save_cookies()
                 self.good_request_count += 1
