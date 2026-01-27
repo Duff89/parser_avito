@@ -5,6 +5,7 @@ from loguru import logger
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from typing import Optional, Dict, List
+from pathlib import Path
 
 from dto import Proxy, ProxySplit
 from playwright_setup import ensure_playwright_installed
@@ -132,6 +133,10 @@ class PlaywrightClient:
         await self._stealth(self.page)
 
     async def load_page(self, url: str):
+        try:
+            config = load_avito_config("config.toml")
+        except Exception as err:
+            logger.error(f"Ошибка загрузки конфига: {err}")
         await self.page.goto(url=url,
                              timeout=60_000,
                              wait_until="domcontentloaded")
