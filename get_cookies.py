@@ -145,8 +145,17 @@ class PlaywrightClient:
             if self.stop_event and self.stop_event.is_set():
                 return {}
             await self.check_block(self.page, self.context)
-            raw_cookie = await self.page.evaluate("() => document.cookie")
-            cookie_dict = self.parse_cookie_string(raw_cookie)
+            if isinstance(config.playwright_state_file,str) and config.playwright_state_file != "":
+                try:
+                    state_file = config.playwright_state_file
+                    state_filepath = Path(state_file)
+                    state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
+                    storage = await self.context.storage_state(path=state_filepath)
+                    logger.info("Сессия пользователя Авито сохранена в " + state_file)
+                except:
+                    logger.error("Не удалось записать сессию в файл " + state_file)
+            raw_cookie = await self.context.cookies(["https://avito.ru","https://www.avito.ru"])
+            cookie_dict = self.convert_cookies_from_playwright_to_requests(raw_cookie)
             if cookie_dict.get("ft"):
                 logger.info("Cookies получены")
                 return cookie_dict
