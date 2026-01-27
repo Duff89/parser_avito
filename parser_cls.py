@@ -515,7 +515,7 @@ class AvitoParse:
                 else:
                     return False
         except:
-            logger.warning(f"Не удалось загрузить JSON из cookies.json")
+            logger.warning(f"Не удалось найти куку sessid в файле cookies.json")
             return False
 
     def get_sessid_from_playwright_state_file(self) -> str:
