@@ -112,7 +112,7 @@ class PlaywrightClient:
             "has_touch": False,
         }
 
-        if isinstance(config.playwright_state_file,str):
+        if isinstance(config.playwright_state_file,str) and config.playwright_state_file != "":
             context_args["storage_state"] = config.playwright_state_file
             logger.debug(f"Используем Playwright state file {config.playwright_state_file}")
         else:
