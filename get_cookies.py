@@ -150,6 +150,13 @@ class PlaywrightClient:
         logger.warning("Не удалось получить cookies")
         return {}
 
+    @staticmethod
+    def convert_cookies_from_playwright_to_requests(context_cookies: List) -> dict:
+        cookie_dict = dict()
+        for cookie in context_cookies:
+            cookie_dict[cookie["name"]] = cookie["value"]
+        return cookie_dict
+
     async def extract_cookies(self, url: str) -> dict:
         try:
             await self.launch_browser()
