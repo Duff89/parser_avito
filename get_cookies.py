@@ -5,9 +5,11 @@ from loguru import logger
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 from typing import Optional, Dict, List
+from pathlib import Path
 
 from dto import Proxy, ProxySplit
 from playwright_setup import ensure_playwright_installed
+from load_config import load_avito_config
 
 MAX_RETRIES = 3
 RETRY_DELAY = 10
@@ -77,6 +79,12 @@ class PlaywrightClient:
 
     async def launch_browser(self):
         ensure_playwright_installed("chromium")
+
+        try:
+            config = load_avito_config("config.toml")
+        except Exception as err:
+            logger.error(f"Ошибка загрузки конфига: {err}")
+
         stealth = Stealth()
         self.playwright_context = stealth.use_async(async_playwright())
         playwright = await self.playwright_context.__aenter__()
@@ -105,6 +113,12 @@ class PlaywrightClient:
             "has_touch": False,
         }
 
+        if isinstance(config.playwright_state_file,str) and config.playwright_state_file != "":
+            context_args["storage_state"] = config.playwright_state_file
+            logger.debug(f"Используем Playwright state file {config.playwright_state_file}")
+        else:
+            logger.debug("Playwright state file не задан. Используем пустой контекст Playwright.")
+
         if self.proxy_split_obj:
             context_args["proxy"] = {
                 "server": self.proxy_split_obj.ip_port,
@@ -119,6 +133,10 @@ class PlaywrightClient:
         await self._stealth(self.page)
 
     async def load_page(self, url: str):
+        try:
+            config = load_avito_config("config.toml")
+        except Exception as err:
+            logger.error(f"Ошибка загрузки конфига: {err}")
         await self.page.goto(url=url,
                              timeout=60_000,
                              wait_until="domcontentloaded")
@@ -127,8 +145,17 @@ class PlaywrightClient:
             if self.stop_event and self.stop_event.is_set():
                 return {}
             await self.check_block(self.page, self.context)
-            raw_cookie = await self.page.evaluate("() => document.cookie")
-            cookie_dict = self.parse_cookie_string(raw_cookie)
+            if isinstance(config.playwright_state_file,str) and config.playwright_state_file != "":
+                try:
+                    state_file = config.playwright_state_file
+                    state_filepath = Path(state_file)
+                    state_filepath.touch(mode=0o600, exist_ok=True) # Set mode to protect sensitive cookies
+                    storage = await self.context.storage_state(path=state_filepath)
+                    logger.info("Сессия пользователя Авито сохранена в " + state_file)
+                except:
+                    logger.error("Не удалось записать сессию в файл " + state_file)
+            raw_cookie = await self.context.cookies(["https://avito.ru","https://www.avito.ru"])
+            cookie_dict = self.convert_cookies_from_playwright_to_requests(raw_cookie)
             if cookie_dict.get("ft"):
                 logger.info("Cookies получены")
                 return cookie_dict
@@ -136,6 +163,13 @@ class PlaywrightClient:
 
         logger.warning("Не удалось получить cookies")
         return {}
+
+    @staticmethod
+    def convert_cookies_from_playwright_to_requests(context_cookies: List) -> dict:
+        cookie_dict = dict()
+        for cookie in context_cookies:
+            cookie_dict[cookie["name"]] = cookie["value"]
+        return cookie_dict
 
     async def extract_cookies(self, url: str) -> dict:
         try:

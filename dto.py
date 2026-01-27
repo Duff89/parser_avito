@@ -44,4 +44,5 @@ class AvitoConfig:
     parse_views: bool = False
     save_xlsx: bool = True
     use_webdriver: bool = True
+    playwright_state_file: str | None = None
 

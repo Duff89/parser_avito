@@ -131,6 +131,11 @@ class AvitoParse:
             proxy_data = {
                 "https": f"http://{self.config.proxy_string}"
             }
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
+            if self.is_sessid_cookie_present():
+                self.load_cookies()
+            elif self.is_avito_account_logged_in():
+                self.cookies = self.get_cookies()
 
         for attempt in range(1, retries + 1):
             if self.stop_event and self.stop_event.is_set():
@@ -156,7 +161,7 @@ class AvitoParse:
                     if attempt >= 3:
                         self.cookies = self.get_cookies()
                     self.change_ip()
-                    raise requests.RequestsError(f"Слишком много запросов: {response.status_code}")
+                    raise requests.RequestsError(f"Слишком много запросов: {response.status_code}. Включите прокси либо войдите в аккаунт Авито")
 
                 self.save_cookies()
                 self.good_request_count += 1
@@ -504,6 +509,48 @@ class AvitoParse:
         except Exception as err:
             logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
 
+    def is_avito_account_logged_in(self) -> bool:
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
+            try:
+                with open(self.config.playwright_state_file, "r") as f:
+                    state_file = json.load(f)
+                    cookies_list = state_file["cookies"]
+                    for cookie in cookies_list:
+                        # sessid contains avito account session and should be present only after logging in
+                        if cookie["name"] == "sessid":
+                            return True
+            except:
+                logger.warning(f"Не удалось загрузить JSON из Playwright state file: {self.config.playwright_state_file}")
+                return False
+        else:
+            return False
+
+    def is_sessid_cookie_present(self) -> bool:
+        try:
+            with open("cookies.json", "r") as f:
+                cookies = json.load(f)
+                # sessid contains avito account session and should be present only after logging in
+                if cookies["sessid"]:
+                    return True
+                else:
+                    return False
+        except:
+            logger.warning(f"Не удалось найти куку sessid в файле cookies.json")
+            return False
+
+    def get_sessid_from_playwright_state_file(self) -> str:
+        if isinstance(self.config.playwright_state_file,str) and self.config.playwright_state_file != "":
+            try:
+                with open(self.config.playwright_state_file, "r") as f:
+                    state_file = json.load(f)
+                    cookies_list = state_file["cookies"]
+                    for cookie in cookies_list:
+                        # sessid contains avito account session and should be present only after logging in
+                        if cookie["name"] == "sessid":
+                            return cookie["value"]
+            except:
+                logger.warning(f"Не удалось загрузить JSON из Playwright state file: {self.config.playwright_state_file}")
+                return None
 
 if __name__ == "__main__":
     try:

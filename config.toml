@@ -26,3 +26,4 @@ one_file_for_link = false
 parse_views = false
 save_xlsx = false
 use_webdriver = true
+playwright_state_file = "state.json"
