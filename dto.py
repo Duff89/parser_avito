@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Optional
 
 
@@ -44,4 +45,6 @@ class AvitoConfig:
     parse_views: bool = False
     save_xlsx: bool = True
     use_webdriver: bool = True
+    cookies_api_key: str = None
+    output_dir: Path = Path("result")
 
