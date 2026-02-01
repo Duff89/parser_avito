@@ -1,29 +1,28 @@
-import asyncio
 import html
 import json
 import random
 import re
 import time
-from urllib.parse import unquote, urlparse, parse_qs, urlencode, urlunparse
 from datetime import datetime, timedelta
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from bs4 import BeautifulSoup
-from curl_cffi import requests
 from loguru import logger
 from pydantic import ValidationError
-from requests.cookies import RequestsCookieJar
 
 from common_data import HEADERS
 from db_service import SQLiteDBHandler
 from dto import Proxy, AvitoConfig
-from get_cookies import get_cookies
+from filters.ads_filter import AdsFilter
 from hide_private_data import log_config
+from integrations.notifications.factory import build_notifier
 from load_config import load_avito_config
 from models import ItemsResponse, Item
-from tg_sender import SendAdToTg
-from vk_sender import SendAdToVK
+from parser.cookies.factory import build_cookies_provider
+from parser.export.factory import build_result_storage
+from parser.http.client import HttpClient
+from parser.proxies.proxy_factory import build_proxy
 from version import VERSION
-from xlsx_service import XLSXHandler
 
 DEBUG_MODE = False
 
@@ -37,41 +36,24 @@ class AvitoParse:
             stop_event=None
     ):
         self.config = config
-        self.proxy_obj = self.get_proxy_obj()
+        self.proxy = build_proxy(self.config)
+        self.cookies_provider = build_cookies_provider(config=config)
         self.db_handler = SQLiteDBHandler()
-        self.tg_handler = self.get_tg_handler()
-        self.vk_handler = self.get_vk_handler()
-        self.xlsx_handler = XLSXHandler(self.__get_file_title())
+        self.notifier = build_notifier(config=config)
+        self.result_storage = None
         self.stop_event = stop_event
-        self.cookies = None
-        self.session = requests.Session()
         self.headers = HEADERS
         self.good_request_count = 0
         self.bad_request_count = 0
-
+        self.http = HttpClient(
+            proxy=self.proxy,
+            cookies=self.cookies_provider,
+            timeout=20,
+            max_retries=self.config.max_count_of_retry,
+        )
+        self.ads_filter = AdsFilter(config=config, is_viewed_fn=self.is_viewed)
         log_config(config=self.config, version=VERSION)
 
-    def get_tg_handler(self) -> SendAdToTg | None:
-        if all([self.config.tg_token, self.config.tg_chat_id]):
-            return SendAdToTg(bot_token=self.config.tg_token, chat_id=self.config.tg_chat_id)
-        return None
-
-    def _send_to_tg(self, ads: list[Item]) -> None:
-        for ad in ads:
-            self.tg_handler.send_to_tg(ad=ad)
-
-    def get_vk_handler(self) -> SendAdToVK | None:
-        if all([self.config.vk_token, self.config.vk_user_id]):
-            logger.info("VK handler инициализирован")
-            return SendAdToVK(vk_token=self.config.vk_token, user_id=self.config.vk_user_id)
-        logger.debug("VK handler не создан: vk_token или vk_user_id не заданы в конфиге")
-        return None
-
-    def _send_to_vk(self, ads: list[Item]) -> None:
-        logger.debug(f"VK: отправляю {len(ads)} объявлений")
-        for ad in ads:
-            self.vk_handler.send_to_vk(ad=ad)
-            time.sleep(1)  # Пауза между сообщениями для VK
 
     def get_proxy_obj(self) -> Proxy | None:
         if all([self.config.proxy_string, self.config.proxy_change_url]):
@@ -82,117 +64,48 @@ class AvitoParse:
         logger.info("Работаем без прокси")
         return None
 
-    def get_cookies(self, max_retries: int = 1, delay: float = 2.0) -> dict | None:
-        if not self.config.use_webdriver:
-            return
+    def fetch_data(self, url: str) -> str | None:
+        if self.stop_event and self.stop_event.is_set():
+            return None
 
-        for attempt in range(1, max_retries + 1):
-            if self.stop_event and self.stop_event.is_set():
-                return None
-
-            try:
-                cookies, user_agent = asyncio.run(
-                    get_cookies(proxy=self.proxy_obj, headless=True, stop_event=self.stop_event))
-                if cookies:
-                    logger.info(f"[get_cookies] Успешно получены cookies с попытки {attempt}")
-
-                    self.headers["user-agent"] = user_agent
-                    return cookies
-                else:
-                    raise ValueError("Пустой результат cookies")
-            except Exception as e:
-                logger.warning(f"[get_cookies] Попытка {attempt} не удалась: {e}")
-                if attempt < max_retries:
-                    time.sleep(delay * attempt)  # увеличиваем задержку
-                else:
-                    logger.error(f"[get_cookies] Все {max_retries} попытки не удались")
-                    return None
-
-    def save_cookies(self) -> None:
-        """Сохраняет cookies из requests.Session в JSON-файл."""
-        with open("cookies.json", "w") as f:
-            json.dump(self.session.cookies.get_dict(), f)
-
-    def load_cookies(self) -> None:
-        """Загружает cookies из JSON-файла в requests.Session."""
         try:
-            with open("cookies.json", "r") as f:
-                cookies = json.load(f)
-                jar = RequestsCookieJar()
-                for k, v in cookies.items():
-                    jar.set(k, v)
-                self.session.cookies.update(jar)
-        except FileNotFoundError:
-            pass
+            response = self.http.request("GET", url)
+            self.good_request_count += 1
+            return response.text
 
-    def fetch_data(self, url, retries=3, backoff_factor=1):
-        proxy_data = None
-        if self.proxy_obj:
-            proxy_data = {
-                "https": f"http://{self.config.proxy_string}"
-            }
-
-        for attempt in range(1, retries + 1):
-            if self.stop_event and self.stop_event.is_set():
-                return
-
-            try:
-                response = self.session.get(
-                    url=url,
-                    headers=self.headers,
-                    proxies=proxy_data,
-                    cookies=self.cookies,
-                    impersonate="chrome",
-                    timeout=20,
-                    verify=False,
-                )
-                logger.debug(f"Попытка {attempt}: {response.status_code}")
-
-                if response.status_code >= 500:
-                    raise requests.RequestsError(f"Ошибка сервера: {response.status_code}")
-                if response.status_code in [302, 403, 429]:
-                    self.bad_request_count += 1
-                    self.session = requests.Session()
-                    if attempt >= 3:
-                        self.cookies = self.get_cookies()
-                    self.change_ip()
-                    raise requests.RequestsError(f"Слишком много запросов: {response.status_code}")
-
-                self.save_cookies()
-                self.good_request_count += 1
-                return response.text
-            except requests.RequestsError as e:
-                logger.debug(f"Попытка {attempt} закончилась неуспешно: {e}")
-                if attempt < retries:
-                    sleep_time = backoff_factor * attempt
-                    logger.debug(f"Повтор через {sleep_time} секунд...")
-                    time.sleep(sleep_time)
-                else:
-                    logger.info("Все попытки были неуспешными")
-                    return None
+        except Exception as err:
+            self.bad_request_count += 1
+            logger.warning(f"Ошибка при запросе {url}: {err}")
+            return None
 
     def parse(self):
-        if self.config.one_file_for_link:
-            self.xlsx_handler = None
+        if not self.config.one_file_for_link:
+            # один storage на весь парсинг
+            self.result_storage = build_result_storage(config=self.config)
 
         for _index, url in enumerate(self.config.urls):
+
+            if self.config.one_file_for_link:
+                # storage для этой ссылки
+                self.result_storage = build_result_storage(
+                    config=self.config,
+                    link_index=_index
+                )
             ads_in_link = []
             for i in range(0, self.config.count):
+                logger.info(f"page={i + 1}")
                 if self.stop_event and self.stop_event.is_set():
                     return
                 if DEBUG_MODE:
                     html_code = open("december.txt", "r", encoding="utf-8").read()
                 else:
-                    html_code = self.fetch_data(url=url, retries=self.config.max_count_of_retry)
+                    html_code = self.fetch_data(url=url)
 
                 if not html_code:
                     logger.warning(
                         f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
                     time.sleep(self.config.pause_between_links)
                     continue
-
-                if not self.xlsx_handler and self.config.one_file_for_link:
-                    self.xlsx_handler = XLSXHandler(f"result/{_index + 1}.xlsx")
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
                 try:
@@ -212,19 +125,13 @@ class AvitoParse:
 
                 filter_ads = self.filter_ads(ads=ads)
 
-                if self.tg_handler and not self.config.one_time_start:
-                    self._send_to_tg(ads=filter_ads)
-
-                if self.vk_handler and not self.config.one_time_start:
-                    self._send_to_vk(ads=filter_ads)
+                self.notifier.notify_many(ads=filter_ads)
 
                 filter_ads = self.parse_views(ads=filter_ads)
 
                 if filter_ads:
                     self.__save_viewed(ads=filter_ads)
-
-                    if self.config.save_xlsx:
-                        ads_in_link.extend(filter_ads)
+                    ads_in_link.extend(filter_ads)
 
                 url = self.get_next_page_url(url=url)
 
@@ -232,22 +139,15 @@ class AvitoParse:
                 time.sleep(self.config.pause_between_links)
 
             if ads_in_link:
-                logger.info(f"Сохраняю в Excel {len(ads_in_link)} объявлений")
-                self.__save_data(ads=ads_in_link)
+                logger.info(f"Сохраняю {len(ads_in_link)} объявлений")
+                self.result_storage.save(ads_in_link)
             else:
                 logger.info("Сохранять нечего")
 
-            if self.config.one_file_for_link:
-                self.xlsx_handler = None
-
         logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
 
-        if self.config.one_time_start and self.tg_handler:
-            self.tg_handler.send_to_tg(msg="Парсинг Авито завершён. Все ссылки обработаны")
-            self.stop_event = True
-
-        if self.config.one_time_start and self.vk_handler:
-            self.vk_handler.send_to_vk(msg="Парсинг Авито завершён. Все ссылки обработаны")
+        if self.config.one_time_start:
+            self.notifier.notify(message="Парсинг Авито завершён. Все ссылки обработаны")
             self.stop_event = True
 
     @staticmethod
@@ -280,66 +180,7 @@ class AvitoParse:
         return {}
 
     def filter_ads(self, ads: list[Item]) -> list[Item]:
-        """Сортирует объявления"""
-        filters = [
-            self._filter_viewed,
-            self._filter_by_price_range,
-            self._filter_by_black_keywords,
-            self._filter_by_white_keyword,
-            self._filter_by_address,
-            self._filter_by_seller,
-            self._filter_by_recent_time,
-            self._filter_by_reserve,
-            self._filter_by_promotion,
-        ]
-
-        for filter_fn in filters:
-            ads = filter_fn(ads)
-            logger.info(f"После фильтрации {filter_fn.__name__} осталось {len(ads)}")
-            if not len(ads):
-                return ads
-        return ads
-
-    def _filter_by_price_range(self, ads: list[Item]) -> list[Item]:
-        try:
-            return [ad for ad in ads if self.config.min_price <= ad.priceDetailed.value <= self.config.max_price]
-        except Exception as err:
-            logger.debug(f"Ошибка при фильтрации по цене: {err}")
-            return ads
-
-    def _filter_by_black_keywords(self, ads: list[Item]) -> list[Item]:
-        if not self.config.keys_word_black_list:
-            return ads
-        try:
-            return [ad for ad in ads if not self._is_phrase_in_ads(ad=ad, phrases=self.config.keys_word_black_list)]
-        except Exception as err:
-            logger.debug(f"Ошибка при проверке объявлений по списку стоп-слов: {err}")
-            return ads
-
-    def _filter_by_white_keyword(self, ads: list[Item]) -> list[Item]:
-        if not self.config.keys_word_white_list:
-            return ads
-        try:
-            return [ad for ad in ads if self._is_phrase_in_ads(ad=ad, phrases=self.config.keys_word_white_list)]
-        except Exception as err:
-            logger.debug(f"Ошибка при проверке объявлений по списку обязательных слов: {err}")
-            return ads
-
-    def _filter_by_address(self, ads: list[Item]) -> list[Item]:
-        if not self.config.geo:
-            return ads
-        try:
-            return [ad for ad in ads if self.config.geo in ad.geo.formattedAddress]
-        except Exception as err:
-            logger.debug(f"Ошибка при проверке объявлений по адресу: {err}")
-            return ads
-
-    def _filter_viewed(self, ads: list[Item]) -> list[Item]:
-        try:
-            return [ad for ad in ads if not self.is_viewed(ad=ad)]
-        except Exception as err:
-            logger.debug(f"Ошибка при проверке объявления по признаку смотрели или не смотрели: {err}")
-            return ads
+        return self.ads_filter.apply(ads)
 
     def _add_seller_to_ads(self, ads: list[Item]) -> list[Item]:
         for ad in ads:
@@ -357,44 +198,6 @@ class AvitoParse:
             )
         return ads
 
-    def _filter_by_seller(self, ads: list[Item]) -> list[Item]:
-        if not self.config.seller_black_list:
-            return ads
-        try:
-            return [ad for ad in ads if not ad.sellerId or ad.sellerId not in self.config.seller_black_list]
-        except Exception as err:
-            logger.debug(f"Ошибка при отсеивании объявления с продавцами из черного списка : {err}")
-            return ads
-
-    def _filter_by_recent_time(self, ads: list[Item]) -> list[Item]:
-        if not self.config.max_age:
-            return ads
-        try:
-            return [ad for ad in ads if
-                    self._is_recent(timestamp_ms=ad.sortTimeStamp, max_age_seconds=self.config.max_age)]
-        except Exception as err:
-            logger.debug(f"Ошибка при отсеивании слишком старых объявлений: {err}")
-            return ads
-
-    def _filter_by_reserve(self, ads: list[Item]) -> list[Item]:
-        if not self.config.ignore_reserv:
-            return ads
-        try:
-            return [ad for ad in ads if not ad.isReserved]
-        except Exception as err:
-            logger.debug(f"Ошибка при отсеивании объявлений в резерве: {err}")
-            return ads
-
-    def _filter_by_promotion(self, ads: list[Item]) -> list[Item]:
-        ads = self._add_promotion_to_ads(ads=ads)
-        if not self.config.ignore_promotion:
-            return ads
-        try:
-            return [ad for ad in ads if not ad.isPromotion]
-        except Exception as err:
-            logger.debug(f"Ошибка при отсеивании продвинутых объявлений: {err}")
-            return ads
-
     def parse_views(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_views:
             return ads
@@ -404,6 +207,8 @@ class AvitoParse:
         for ad in ads:
             try:
                 html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
+                if not html_code_full_page:
+                    continue
                 ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
                 delay = random.uniform(0.1, 0.9)
                 time.sleep(delay)
@@ -425,33 +230,12 @@ class AvitoParse:
 
         return total, today
 
-    def change_ip(self) -> bool:
-        if not self.config.proxy_change_url:
-            logger.info("Сейчас бы была смена ip, но мы без прокси")
-            return False
-        logger.info("Меняю IP")
-        try:
-            res = requests.get(url=self.config.proxy_change_url, verify=False)
-            if res.status_code == 200:
-                logger.info("IP изменен")
-                return True
-        except Exception as err:
-            logger.info(f"При смене ip возникла ошибка: {err}")
-        logger.info("Не удалось изменить IP, пробую еще раз")
-        time.sleep(random.randint(3, 10))
-        return self.change_ip()
-
     @staticmethod
     def _extract_seller_slug(data):
         match = re.search(r"/brands/([^/?#]+)", str(data))
         if match:
             return match.group(1)
         return None
-
-    @staticmethod
-    def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:
-        full_text_from_ad = (ad.title + ad.description).lower()
-        return any(phrase.lower() in full_text_from_ad for phrase in phrases)
 
     def is_viewed(self, ad: Item) -> bool:
         """Проверяет, смотрели мы это или нет"""
@@ -462,23 +246,6 @@ class AvitoParse:
         now = datetime.utcnow()
         published_time = datetime.utcfromtimestamp(timestamp_ms / 1000)
         return (now - published_time) <= timedelta(seconds=max_age_seconds)
-
-    def __get_file_title(self) -> str:
-        """Определяет название файла"""
-        title_file = 'all'
-        if self.config.keys_word_white_list:
-            title_file = "-".join(list(map(str.lower, self.config.keys_word_white_list)))
-            if len(title_file) > 50:
-                title_file = title_file[:50]
-
-        return f"result/{title_file}.xlsx"
-
-    def __save_data(self, ads: list[Item]) -> None:
-        """Сохраняет результат в файл keyword*.xlsx и в БД"""
-        try:
-            self.xlsx_handler.append_data_from_page(ads=ads)
-        except Exception as err:
-            logger.info(f"При сохранении в Excel ошибка {err}")
 
     def __save_viewed(self, ads: list[Item]) -> None:
         """Сохраняет просмотренные объявления"""
@@ -522,5 +289,6 @@ if __name__ == "__main__":
             logger.info(f"Парсинг завершен. Пауза {config.pause_general} сек")
             time.sleep(config.pause_general)
         except Exception as err:
+            logger.exception(err)
             logger.error(f"Произошла ошибка {err}. Будет повторный запуск через 30 сек.")
             time.sleep(30)

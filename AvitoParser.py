@@ -5,12 +5,13 @@ from pathlib import Path
 import flet as ft
 from loguru import logger
 
+from dto import AvitoConfig
+from integrations.notifications.factory import build_notifier
 from lang import *
 from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
-from tg_sender import SendAdToTg
-from vk_sender import SendAdToVK
 from version import VERSION
+
 
 def main(page: ft.Page):
     page.title = f'Parser Avito v {VERSION}'
@@ -61,6 +62,7 @@ def main(page: ft.Page):
         parse_views.value = config.parse_views
         save_xlsx.value = config.save_xlsx
         use_webdriver.value = config.use_webdriver
+        cookies_api_key.value = config.cookies_api_key
 
         page.update()
 
@@ -98,6 +100,7 @@ def main(page: ft.Page):
             "parse_views": parse_views.value,
             "save_xlsx": save_xlsx.value,
             "use_webdriver": use_webdriver.value,
+            "cookies_api_key": cookies_api_key.value
         }}
 
         save_avito_config(config)
@@ -111,48 +114,65 @@ def main(page: ft.Page):
         logger.add(logger_console_widget, format="{time:HH:mm:ss} - {message}")
 
     def logger_console_widget(message):
-        console_widget.value += message
+        console_widget.controls.append(
+            ft.Text(
+                message.rstrip(), # убираем перенос строки с логов
+                size=12,
+                color=ft.colors.GREEN,
+            )
+        )
         page.update()
 
     def telegram_log_test(e):
-        """Тестирование отправки сообщения в telegram"""
-        logger.info("Сейчас будет проверка данных telegram")
-        token = tg_token.value
-        chat_id = tg_chat_id.value
-        if all([token, chat_id]):
-            SendAdToTg(
-                bot_token=token,
-                chat_id=chat_id.split()
-            ).send_to_tg(msg="Это тестовое сообщение")
-            return
-        logger.info("Должны быть заполнены поля ТОКЕН TELEGRAM и CHAT ID TELEGRAM")
+        """Тестирование отправки уведомлений"""
+        logger.info("Проверка настроек уведомлений")
+
+        try:
+            config = AvitoConfig(
+                tg_token=tg_token.value,
+                tg_chat_id=tg_chat_id.value.split(),
+                urls=[] # заглушка
+            )
+
+            notifier = build_notifier(config=config)
+            notifier.notify(message="✅ Это тестовое сообщение")
+
+        except Exception as err:
+            logger.error(f"Ошибка при проверке Telegram: {err}")
 
     def vk_log_test(e):
-        """Тестирование отправки сообщения в VK"""
-        logger.info("Сейчас будет проверка данных VK")
-        token = vk_token.value
-        user_id = vk_user_id.value
-        if all([token, user_id]):
-            SendAdToVK(
-                vk_token=token,
-                user_id=user_id.splitlines()
-            ).send_to_vk(msg="Это тестовое сообщение от парсера Avito")
-            return
-        logger.info("Должны быть заполнены поля ТОКЕН VK и USER ID VK")
+        """Тестирование отправки уведомлений VK"""
+        logger.info("Проверка настроек VK")
+
+        try:
+            config = AvitoConfig(
+                vk_token=vk_token.value,
+                vk_user_id=vk_user_id.value.splitlines(),
+                urls=[] # заглушка
+            )
+
+            notifier = build_notifier(config=config)
+            notifier.notify(message="✅ Это тестовое сообщение от парсера Avito")
+
+        except Exception as err:
+            logger.error(f"Ошибка при проверке VK: {err}")
 
     dlg_modal_proxy = ft.AlertDialog(
         modal=True,
-        title=ft.Text("Подробнее насчёт прокси"),
+        title=ft.Text("Помощь по разделу:"),
         content=ft.Container(
-            content=ft.Text(BUY_PROXY_LINK, size=20),
+            content=ft.Text(PROXY_PANEL_HELP, size=14),
             width=600,
-            height=400,
+            height=600,
             padding=10
         ),
         actions=[
             ft.TextButton("Купить прокси",
                           on_click=lambda e: page.launch_url(
                               PROXY_LINK)),
+            ft.TextButton("Зарегистрироваться на spfa.ru",
+                          on_click=lambda e: page.launch_url(
+                              SPFA_LINK)),
             ft.TextButton("Отмена", on_click=close_dlg),
 
         ],
@@ -160,10 +180,12 @@ def main(page: ft.Page):
         on_dismiss=lambda e: print("Modal dialog dismissed!"),
     )
 
+
     def open_dlg_modal(e):
         page.overlay.append(dlg_modal_proxy)
         dlg_modal_proxy.open = True
         page.update()
+
 
     def start_parser(e):
         nonlocal is_run
@@ -174,7 +196,6 @@ def main(page: ft.Page):
         stop_event.clear()
         save_config()
         console_widget.height = 700
-        input_fields.visible = False
         start_btn.visible = False
         stop_btn.visible = True
         is_run = True
@@ -202,7 +223,6 @@ def main(page: ft.Page):
         logger.debug("Стоп")
         is_run = False
         console_widget.height = 100
-        input_fields.visible = True
         stop_btn.visible = False
         start_btn.visible = True
         start_btn.text = "Останавливаюсь..."
@@ -210,7 +230,7 @@ def main(page: ft.Page):
         page.update()
 
     def check_string():
-        if proxy.value and "proxy.site" not in proxy.value:
+        if proxy.value and ("proxy.site" not in proxy.value or "@" not in proxy.value):
             dlg_modal = ft.AlertDialog(
                 modal=True,
                 title=ft.Text("Проблемы с прокси"),
@@ -238,7 +258,29 @@ def main(page: ft.Page):
         start_btn.text = "Старт"
         page.update()
 
-    label_required = ft.Text("Обязательные параметры", size=20)
+
+    def panel(title: str, content: list[ft.Control], expanded=False):
+        panel_ref = ft.Ref[ft.ExpansionPanel]()
+
+        def toggle(e):
+            panel_ref.current.expanded = not panel_ref.current.expanded
+            page.update()
+
+        return ft.ExpansionPanel(
+            ref=panel_ref,
+            header=ft.Container(
+                content=ft.ListTile(
+                    title=ft.Text(title, weight=ft.FontWeight.BOLD),
+                ),
+                on_click=toggle,
+            ),
+            content=ft.Container(
+                content=ft.Column(content, spacing=10),
+                padding=15
+            ),
+            expanded=expanded
+        )
+
     url_input = ft.TextField(
         label="Вставьте начальную ссылку или ссылки. Используйте Enter между значениями",
         multiline=True,
@@ -250,11 +292,10 @@ def main(page: ft.Page):
         height=70,
 
     )
-    min_price = ft.TextField(label="Минимальная цена", width=400, expand=True, text_size=12, height=40,
+    min_price = ft.TextField(label="Минимальная цена", width=300, expand=True, text_size=12, height=40,
                              tooltip=MIN_PRICE_HELP)
-    max_price = ft.TextField(label="Максимальная цена", width=400, expand=True, text_size=12, height=40,
+    max_price = ft.TextField(label="Максимальная цена", width=300, expand=True, text_size=12, height=40,
                              tooltip=MAX_PRICE_HELP)
-    label_not_required = ft.Text("Дополнительные параметры", height=20)
     keys_word_white_list = ft.TextField(
         label="Ключевые слова (через Enter)",
         multiline=True,
@@ -275,16 +316,16 @@ def main(page: ft.Page):
         tooltip=KEYWORD_BLACK_INPUT_HELP,
         text_size=12, height=60,
     )
-    count_page = ft.TextField(label="Количество страниц", width=400, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
-                              height=30, )
+    count_page = ft.TextField(label="Количество страниц", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
+                              height=40, )
     pause_general = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, text_size=12,
-                                 height=30, tooltip=PAUSE_GENERAL_HELP)
+                                 height=40, tooltip=PAUSE_GENERAL_HELP)
     pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
-                                       height=30, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
+                                       height=40, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
 
-    max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=30, expand=True,
+    max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=40, expand=True,
                            tooltip=MAX_AGE_HELP)
-    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=400, text_size=12, height=30, expand=True,
+    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=300, text_size=12, height=40, expand=True,
                                       tooltip=MAX_COUNT_OF_RETRY_HELP)
     tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=70, expand=True,
                             tooltip=TG_TOKEN_HELP)
@@ -302,11 +343,47 @@ def main(page: ft.Page):
     proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
                          tooltip=PROXY_HELP)
     proxy_change_ip = ft.TextField(
-        label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=***", width=400,
+        label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=*** (только для мобильных прокси)", width=400,
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
-    proxy_btn_help = ft.ElevatedButton(text="Подробнее про прокси", on_click=open_dlg_modal, expand=True,
+    proxy_btn_panel_help = ft.FilledButton(text="Помощь", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
-    geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=30,
+
+
+    proxy_help_icon = ft.Icon(
+        ft.icons.HELP_OUTLINE,
+        tooltip="Cправка по прокси:\n\n"
+                "• Если есть мобильный прокси — заполните оба поля\n"
+                "• Если это серверный прокси — только первое поле\n"
+                "• Не знаете, что это вообще такое - кликайте <Помощь> ниже\n",
+    )
+
+    cookies_api_key = ft.TextField(
+        label="API ключ сервиса обхода блокировок spfa.ru (опционально)",
+        password=True,
+        can_reveal_password=True,
+        expand=True,
+    )
+    bypass_api_key_help_icon = ft.Icon(
+        ft.icons.HELP_OUTLINE,
+        tooltip="api-key:\n\n"
+                "• Зарегистрируйтесь на spfa.ru, чтобы его получить\n"
+                "• Данный ключ поможет в обходе блокировок\n"
+    )
+
+    account_login_btn = ft.ElevatedButton(
+        text="🔐 Войти в свой аккаунт (опционально)",
+        icon=ft.icons.LOGIN,
+        disabled=True,
+        tooltip="Еще не реализовано"
+    )
+    account_login_btn_help_icon = ft.Icon(
+        ft.icons.HELP_OUTLINE,
+        tooltip="Можно использовать свой аккаунт:\n\n"
+                "• Такой способ будет стабильно работать\n"
+                "• Есть риск блокировки этого аккаунта\n"
+    )
+
+    geo = ft.TextField(label="Ограничение по городу", width=400, expand=True, text_size=12, height=40,
                        tooltip=GEO_HELP)
     seller_black_list = ft.TextField(
         label="Черный список продавцов (через Enter)",
@@ -321,8 +398,11 @@ def main(page: ft.Page):
     start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
     stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
                                  style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
-    console_widget = ft.Text(width=800, height=60, color=ft.colors.GREEN, value="", selectable=True,
-                             expand=True)
+    console_widget = ft.ListView(
+        expand=True,
+        spacing=2,
+        auto_scroll=True,
+    )
 
     buy_me_coffe_btn = ft.TextButton("Продвинуть разработку",
                                      on_click=lambda e: page.launch_url(DONAT_LINK),
@@ -344,100 +424,95 @@ def main(page: ft.Page):
     use_webdriver = ft.Checkbox(label="Использовать браузер", value=True,
                             tooltip=USE_WEBDRIVER_HELP)
 
-
-    input_fields = ft.Column(
-        [
-            label_required,
-            url_input,
-            ft.Row(
-                [min_price, max_price],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            # ft.Text(""),
-            label_not_required,
-
-            ft.Row(
-                [keys_word_white_list, keys_word_black_list],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            ft.Row(
-                [count_page, pause_general],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            ft.Row(
-                [geo, pause_between_links],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            ft.Row(
-                [max_age, max_count_of_retry],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            seller_black_list,
-            ft.Row(
-                [tg_token, tg_chat_id],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            btn_test_tg,
-            ft.Row(
-                [vk_token, vk_user_id],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            btn_test_vk,
-            ft.Row(
-                [proxy, proxy_change_ip],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            proxy_btn_help,
-            ft.Row(
-                [ignore_ads_in_reserv, ignore_promote_ads, one_time_start, one_file_for_link],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
-            ),
-            ft.Row(
-                [parse_views, save_xlsx, use_webdriver],
-                alignment=ft.MainAxisAlignment.CENTER,
-                spacing=0
+    accordion = ft.ExpansionPanelList(
+        expand_icon_color=ft.colors.GREEN_300,
+        elevation=2,
+        divider_color=ft.colors.GREY_700,
+        controls=[
+            panel(
+                "🔴 Основные параметры",
+                [
+                    url_input,
+                    ft.Row([min_price, max_price]),
+                    count_page,
+                ],
+                expanded=True
             ),
 
-        ],
-        expand=True,
-        alignment=ft.MainAxisAlignment.CENTER,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            panel(
+                "🟡 Фильтрация",
+                [
+                    ft.Row([keys_word_white_list, keys_word_black_list]),
+                    seller_black_list,
+                    ft.Row([geo,max_age]),
+                    ft.Row([ignore_ads_in_reserv, ignore_promote_ads]),
+                ]
+            ),
 
+            panel(
+                "📨 Уведомления",
+                [
+                    ft.Text("Telegram", weight=ft.FontWeight.BOLD),
+                    ft.Row([tg_token, tg_chat_id]),
+                    btn_test_tg,
+
+                    ft.Divider(),
+
+                    ft.Text("VK", weight=ft.FontWeight.BOLD),
+                    ft.Row([vk_token, vk_user_id]),
+                    btn_test_vk
+                ]
+            ),
+
+            panel(
+                "🌐 Прокси и обход блокировок",
+                [
+                    ft.Row([proxy, proxy_change_ip, proxy_help_icon]),
+                    ft.Row([cookies_api_key, bypass_api_key_help_icon]),
+                    ft.Row([account_login_btn, account_login_btn_help_icon]),
+                    ft.Row([proxy_btn_panel_help], alignment=ft.MainAxisAlignment.CENTER,
+                spacing=0)
+                ]
+            ),
+
+            panel(
+                "⚙️ Поведение парсера",
+                [
+                    ft.Row([pause_general, pause_between_links]),
+                    max_count_of_retry,
+                    ft.Row([one_time_start, one_file_for_link]),
+                    ft.Row([parse_views, save_xlsx]),
+                ]
+            ),
+
+            panel(
+                "▶️ Запуск",
+                [
+                    console_widget,
+                    start_btn,
+                    stop_btn,
+                ]
+            ),
+        ]
     )
 
-    controls = ft.Column(
-        [console_widget,
-         start_btn,
-         stop_btn],
-        expand=True,
-        alignment=ft.MainAxisAlignment.CENTER,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER
+    other_btn = ft.Row(
+        [buy_me_coffe_btn, report_issue_btn],
+        alignment=ft.MainAxisAlignment.CENTER
     )
-    other_btn = ft.Row([buy_me_coffe_btn, report_issue_btn], expand=True, alignment=ft.MainAxisAlignment.CENTER)
-    all_field = ft.Column([
-        other_btn,
-        input_fields,
-        controls,
-    ], alignment=ft.MainAxisAlignment.CENTER,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def start_page():
-        page.add(ft.Column(
-            [all_field],
-            expand=True,
-            alignment=ft.MainAxisAlignment.CENTER,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            scroll=ft.ScrollMode.AUTO
-        ))
+        page.add(
+            ft.Column(
+                [
+                    other_btn,
+                    accordion,
+                ],
+                expand=True,
+                scroll=ft.ScrollMode.AUTO,
+                spacing=20
+            )
+        )
 
     set_up()
     start_page()
