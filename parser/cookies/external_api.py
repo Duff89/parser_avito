@@ -27,6 +27,16 @@ class ExternalApiCookiesProvider(CookiesProvider):
 
         self._load_from_disk()
 
+        self.headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+
     # =====================
     # Public API
     # =====================
@@ -81,6 +91,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
                     "id": self.last_id,
                     "api_key": self.api_key,
                 },
+                headers=self.headers,
                 timeout=15,
             )
         except requests.RequestException as e:
@@ -129,6 +140,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
             logger.error(
                 f"❌ Неожиданный ответ от сервера | статус={res.status_code} | тело={res.text}"
             )
+            return
 
         # ---- Только здесь можно покупать новые ----
         logger.warning(
@@ -149,6 +161,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
             res = requests.post(
                 f"{API_URL}/cookies/",
                 json={"api_key": self.api_key},
+                headers=self.headers,
                 timeout=15,
             )
         except requests.RequestException as e:

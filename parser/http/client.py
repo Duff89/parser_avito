@@ -23,7 +23,7 @@ class HttpClient:
         timeout: int = 20,
         max_retries: int = 5,
         retry_delay: int = 5,
-        block_threshold: int = 2,  # ← сколько блоков подряд терпим
+        block_threshold: int = 3,  # ← сколько блоков подряд терпим
     ):
         self.proxy = proxy
         self.cookies = cookies
