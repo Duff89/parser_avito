@@ -1,0 +1,85 @@
+name: 🐛 Ошибка / Bug report
+description: Сообщить об ошибке в работе парсера
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Важно**
+        Issue без заполненных полей, логов и конфига  
+        **будут закрываться без рассмотрения**.
+
+  - type: input
+    id: os
+    attributes:
+      label: ОС
+      placeholder: "Windows 11 / Ubuntu 22.04"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия парсера
+      placeholder: "v3.2.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: run_mode
+    attributes:
+      label: Способ запуска
+      options:
+        - Docker
+        - Python (venv)
+        - exe
+        - Другое
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_text
+    attributes:
+      label: Текст ошибки
+      description: |
+        Вставьте traceback или сообщение об ошибке целиком.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи
+      description: |
+        Приложите лог-файл или вывод консоли.
+        Лучше всего — весь файл логов (logs\app.log).
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Конфиг
+      description: |
+        Приложите конфигурацию (файл config.toml), **заменив приватные данные**:
+
+        ❗ Обязательно замаскируйте:
+        - proxy_string, proxy_change_url
+        - cookies_api_key
+        - tg_token / tg_chat_id / vk_token / vk_user_id
+
+        Пример:
+        ```toml
+        proxy_string = "login:****@ip:port"
+        cookies_api_key = "****"
+        tg_token = "****"
+        ```
+        Главное — чтобы было понятно:
+        - какие поля заполнены
+        - в каком формате
+      render: shell
+    validations:
+      required: true
