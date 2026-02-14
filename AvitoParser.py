@@ -10,6 +10,7 @@ from integrations.notifications.factory import build_notifier
 from lang import *
 from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
+from utils import prompt_user_login
 from version import VERSION
 
 
@@ -186,6 +187,9 @@ def main(page: ft.Page):
         dlg_modal_proxy.open = True
         page.update()
 
+    async def btn_prompt_user_login_handler(e):
+        await prompt_user_login.wrapper()
+
 
     def start_parser(e):
         nonlocal is_run
@@ -345,7 +349,7 @@ def main(page: ft.Page):
     proxy_change_ip = ft.TextField(
         label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=*** (только для мобильных прокси)", width=400,
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
-    proxy_btn_panel_help = ft.FilledButton(text="Помощь", on_click=open_dlg_modal, expand=True,
+    proxy_btn_panel_help = ft.FilledButton(text="Помощь (если ничего непонятно)", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
 
 
@@ -373,8 +377,8 @@ def main(page: ft.Page):
     account_login_btn = ft.ElevatedButton(
         text="🔐 Войти в свой аккаунт (опционально)",
         icon=ft.icons.LOGIN,
-        disabled=True,
-        tooltip="Еще не реализовано"
+        on_click=btn_prompt_user_login_handler, expand=True,
+        tooltip=PROMPT_USER_LOGIN_HELP
     )
     account_login_btn_help_icon = ft.Icon(
         ft.icons.HELP_OUTLINE,

@@ -47,4 +47,5 @@ class AvitoConfig:
     use_webdriver: bool = True
     cookies_api_key: str = None
     output_dir: Path = Path("result")
+    use_own_cookies: bool = True
 
