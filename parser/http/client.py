@@ -39,6 +39,7 @@ class HttpClient:
             proxy=self.proxy.get_httpx_proxy(),
             timeout=self.timeout,
             headers=HEADERS,
+            http2=False
         )
 
     def request(self, method: str, url: str, **kwargs) -> httpx.Response:
