@@ -26,3 +26,8 @@ class CompositeResultStorage(ResultStorage):
                 logger.exception(
                     f"Failed to save results using {storage.__class__.__name__}: {e}"
                 )
+
+
+class NullResultStorage(ResultStorage):
+    def save(self, ads: list[Item]) -> None:
+        pass

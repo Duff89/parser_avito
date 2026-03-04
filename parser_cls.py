@@ -22,6 +22,7 @@ from parser.cookies.factory import build_cookies_provider
 from parser.export.factory import build_result_storage
 from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
+from utils.parse_phone import ParsePhone
 from version import VERSION
 
 DEBUG_MODE = False
@@ -117,6 +118,8 @@ class AvitoParse:
 
                 ads = self._clean_null_ads(ads=ads_models.items)
 
+                logger.info(f"Объявлений перед чисткой {len(ads)}")
+
                 ads = self._add_seller_to_ads(ads=ads)
 
                 if not ads:
@@ -127,7 +130,11 @@ class AvitoParse:
 
                 self.notifier.notify_many(ads=filter_ads)
 
+                # Просмотры
                 filter_ads = self.parse_views(ads=filter_ads)
+
+                # Телефоны
+                filter_ads = self.parse_phone(ads=filter_ads)
 
                 if filter_ads:
                     self.__save_viewed(ads=filter_ads)
@@ -217,6 +224,17 @@ class AvitoParse:
                 continue
 
         return ads
+
+    def parse_phone(self, ads: list[Item]) -> list[Item]:
+        if not self.config.parse_phone or self.config.parse_phone:
+            # future feat
+            return ads
+
+        try:
+            return ParsePhone(ads=ads, config=self.config).parse_phones()
+        except Exception as err:
+            logger.warning(f"Ошибка при парсинге телефонов: {err}")
+            return ads
 
     @staticmethod
     def _extract_views(html: str) -> tuple:

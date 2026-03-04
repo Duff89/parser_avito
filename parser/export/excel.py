@@ -3,6 +3,7 @@ from threading import Lock
 from datetime import datetime
 
 from openpyxl import Workbook, load_workbook
+from loguru import logger
 from tzlocal import get_localzone
 
 from parser.export.base import ResultStorage
@@ -27,6 +28,7 @@ class ExcelStorage(ResultStorage):
         "Поднято",
         "Просмотры (всего)",
         "Просмотры (сегодня)",
+        "Телефон"
     ]
 
     def __init__(self, file_path: Path):
@@ -71,11 +73,15 @@ class ExcelStorage(ResultStorage):
 
     @staticmethod
     def _get_largest_image_url(img) -> str:
-        best_key = max(
-            img.root.keys(),
-            key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
-        )
-        return str(img.root[best_key])
+        try:
+            best_key = max(
+                img.root.keys(),
+                key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
+            )
+            return str(img.root[best_key])
+        except Exception as err:
+            logger.error(f"При определении лучшего изображения ошибка: {err}")
+            return ""
 
     @staticmethod
     def excel_safe(value):
@@ -112,6 +118,7 @@ class ExcelStorage(ResultStorage):
                     "Да" if ad.isPromotion else "Нет",
                     ad.total_views or "",
                     ad.today_views or "",
+                    self.excel_safe(ad.phone or ""),
                 ]
 
                 sheet.append(row)

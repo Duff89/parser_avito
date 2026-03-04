@@ -20,8 +20,8 @@ class VKNotifier(Notifier):
             return requests.post(
                 "https://api.vk.com/method/messages.send",
                 headers=headers,
-                json={
-                    "domain": self.user_id,
+                data={
+                    "peer_id": self.user_id,
                     "random_id": 0,
                     "message": message,
                     "v": "5.199"
@@ -41,7 +41,7 @@ class VKNotifier(Notifier):
             if _image_url:
                 attachment = self.__upload_photo_to_vk(_image_url, str(self.user_id))
             payload = {
-                "domain": self.user_id,
+                "peer_id": self.user_id,
                 "random_id": 0,
                 "message": message,
                 "v": "5.199"
@@ -55,7 +55,7 @@ class VKNotifier(Notifier):
 
             return requests.post(
                 "https://api.vk.com/method/messages.send",
-                json=payload,
+                data=payload,
                 headers=headers,
                 timeout=10,
             )
@@ -89,7 +89,7 @@ class VKNotifier(Notifier):
             upload_server_response = requests.post(
                 "https://api.vk.com/method/photos.getMessagesUploadServer",
                 headers=headers,
-                data={"v": "5.199"}
+                params={"v": "5.199"}
             ).json()
 
             if "error" in upload_server_response:
@@ -113,7 +113,7 @@ class VKNotifier(Notifier):
             save_response = requests.post(
                 "https://api.vk.com/method/photos.saveMessagesPhoto",
                 headers=headers,
-                data={
+                params={
                     "photo": upload_response["photo"],
                     "server": upload_response["server"],
                     "hash": upload_response["hash"],
