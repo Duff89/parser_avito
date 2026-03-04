@@ -147,6 +147,7 @@ class Item(BaseModel):
     isPromotion: bool = False
     total_views: int | None = None
     today_views: int | None = None
+    phone: str | None = None
 
 
 class ItemsResponse(BaseModel):

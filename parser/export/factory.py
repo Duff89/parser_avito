@@ -4,7 +4,7 @@ from dto import AvitoConfig
 
 from parser.export.base import ResultStorage
 from parser.export.excel import ExcelStorage
-from parser.export.composite import CompositeResultStorage
+from parser.export.composite import CompositeResultStorage, NullResultStorage
 
 
 def build_result_storage(
@@ -19,7 +19,7 @@ def build_result_storage(
         storages.append(ExcelStorage(file_path))
 
     if not storages:
-        raise RuntimeError("No result storage enabled")
+        return NullResultStorage()
 
     return CompositeResultStorage(storages)
 

@@ -45,7 +45,9 @@ class AvitoConfig:
     parse_views: bool = False
     save_xlsx: bool = True
     use_webdriver: bool = True
+    use_bypass_api: bool = False
     cookies_api_key: str = None
     output_dir: Path = Path("result")
     use_own_cookies: bool = True
+    parse_phone: bool = False
 
