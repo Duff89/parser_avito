@@ -48,6 +48,7 @@
 ---
 
 ### 🎥 Обзор и видео
+- [Обзор последней версии](https://youtu.be/hh4kYBfjRcA)
 - [Как запустить локально и на сервере, подробная инструкция для новичков](https://youtu.be/_XQW2ApNwiQ) — хоть и про старую версию, но настоятельно рекомендую посмотреть  
 - [Плейлист разработки](https://www.youtube.com/playlist?list=PLK9kK8z0fpqxPakGZvxo7y6HtCBTYihUF)
 
