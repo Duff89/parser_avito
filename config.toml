@@ -27,4 +27,7 @@ one_file_for_link = false
 parse_views = false
 save_xlsx = true
 use_webdriver = false
+use_bypass_api = false
 cookies_api_key = ""
+use_own_cookies = false
+parse_phone = false

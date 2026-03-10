@@ -48,6 +48,6 @@ class AvitoConfig:
     use_bypass_api: bool = False
     cookies_api_key: str = None
     output_dir: Path = Path("result")
-    use_own_cookies: bool = True
+    use_own_cookies: bool = False
     parse_phone: bool = False
 

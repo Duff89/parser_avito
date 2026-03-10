@@ -22,7 +22,7 @@ class HttpClient:
         cookies: CookiesProvider | None = None,
         timeout: int = 20,
         max_retries: int = 5,
-        retry_delay: int = 5,
+        retry_delay: int = 5,  # задержка после блокировки
         block_threshold: int = 3,  # ← сколько блоков подряд терпим
     ):
         self.proxy = proxy
