@@ -95,5 +95,5 @@ class AdsFilter:
 
     @staticmethod
     def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:
-        full_text = (ad.title + ad.description).lower()
+        full_text = ((ad.title or "") + (ad.description or "")).lower()
         return any(phrase.lower() in full_text for phrase in phrases)
