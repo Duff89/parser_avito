@@ -181,6 +181,7 @@ class AvitoParse:
 
         except Exception as err:
             logger.error(f"Ошибка при поиске информации на странице: {err}")
+        logger.warning("not found json")
         return {}
 
 
