@@ -69,6 +69,7 @@ def main(page: ft.Page):
         cookies_api_key.value = config.cookies_api_key
         use_own_account.value = config.use_own_cookies
         parse_phone.value = config.parse_phone
+        proxy_notifier.value = config.proxy_notifier
 
         page.update()
 
@@ -110,6 +111,7 @@ def main(page: ft.Page):
             "cookies_api_key": cookies_api_key.value,
             "use_own_cookies": use_own_account.value,
             "parse_phone": parse_phone.value,
+            "proxy_notifier": proxy_notifier.value,
         }}
 
         save_avito_config(config)
@@ -123,13 +125,19 @@ def main(page: ft.Page):
         logger.add(logger_console_widget, format="{time:HH:mm:ss} - {message}")
 
     def logger_console_widget(message):
+        MAX_LOG_LINES = 500
         console_widget.controls.append(
             ft.Text(
-                message.rstrip(), # убираем перенос строки с логов
+                message.rstrip(),
                 size=12,
                 color=ft.colors.GREEN,
             )
         )
+
+        # удаляем старые логи
+        if len(console_widget.controls) > MAX_LOG_LINES:
+            console_widget.controls.pop(0)
+
         page.update()
 
     def telegram_log_test(e):
@@ -140,6 +148,7 @@ def main(page: ft.Page):
             config = AvitoConfig(
                 tg_token=tg_token.value,
                 tg_chat_id=tg_chat_id.value.split(),
+                proxy_notifier=proxy_notifier.value,
                 urls=[] # заглушка
             )
 
@@ -390,17 +399,19 @@ def main(page: ft.Page):
                            tooltip=MAX_AGE_HELP)
     max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=300, text_size=12, height=40, expand=True,
                                       tooltip=MAX_COUNT_OF_RETRY_HELP)
-    tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=70, expand=True,
+    tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=50, expand=True,
                             tooltip=TG_TOKEN_HELP)
     tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько через Enter", width=400,
-                              multiline=True, expand=True, text_size=12, height=70, tooltip=TG_CHAT_ID_HELP)
+                              multiline=True, expand=True, text_size=12, height=50, tooltip=TG_CHAT_ID_HELP)
+    proxy_notifier = ft.TextField(label="Прокси для tg", width=400,
+                              multiline=False, expand=True, text_size=12, height=50, tooltip=PROXY_NOTIFIER_HELP)
     btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
-    vk_token = ft.TextField(label="Token VK (сообщества)", width=400, text_size=12, height=70, expand=True,
+    vk_token = ft.TextField(label="Token VK (сообщества)", width=400, text_size=12, height=50, expand=True,
                             tooltip="Токен доступа VK API от имени сообщества")
-    vk_user_id = ft.TextField(label="User ID VK (username). Можно несколько через Enter", width=400,
-                              multiline=True, expand=True, text_size=12, height=70,
-                              tooltip="Username или ID пользователей VK для отправки сообщений")
+    vk_user_id = ft.TextField(label="User ID VK. Можно несколько через Enter", width=400,
+                              multiline=True, expand=True, text_size=12, height=50,
+                              tooltip="ID пользователей VK для отправки сообщений")
     btn_test_vk = ft.ElevatedButton(text="Проверить VK", disabled=False, on_click=vk_log_test, expand=True,
                                     tooltip="Отправить тестовое сообщение в VK")
     proxy = ft.TextField(label="Прокси в формате username:password@mproxy.site:port", width=400, expand=True,
@@ -532,6 +543,7 @@ def main(page: ft.Page):
                 [
                     ft.Text("Telegram", weight=ft.FontWeight.BOLD),
                     ft.Row([tg_token, tg_chat_id]),
+                    ft.Row([proxy_notifier, ]),
                     btn_test_tg,
 
                     ft.Divider(),

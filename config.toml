@@ -31,3 +31,4 @@ use_bypass_api = false
 cookies_api_key = ""
 use_own_cookies = false
 parse_phone = false
+proxy_notifier = ""

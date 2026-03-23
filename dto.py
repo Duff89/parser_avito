@@ -50,4 +50,5 @@ class AvitoConfig:
     output_dir: Path = Path("result")
     use_own_cookies: bool = False
     parse_phone: bool = False
+    proxy_notifier: str = None
 
