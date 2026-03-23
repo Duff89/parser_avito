@@ -5,6 +5,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -95,4 +98,4 @@ jobs:
             Автоматическая сборка версии **${{ steps.version.outputs.version }}**
           files: dist/AvitoParser_${{ steps.version.outputs.version }}.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
