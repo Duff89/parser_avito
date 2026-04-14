@@ -13,7 +13,7 @@ RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 def send_with_retries(
     send_fn: Callable[[], requests.Response],
     *,
-    retries: int = 5,
+    retries: int = 3,
     delay: float = 2.0,
     backoff: float = 1.5,
 ):

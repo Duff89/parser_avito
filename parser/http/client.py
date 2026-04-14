@@ -1,21 +1,13 @@
 """
 Клиент для запросов парсера (curl_cffi)
 """
-
+import random
 import time
 from curl_cffi import requests
 from loguru import logger
 
 from parser.cookies.base import CookiesProvider
 from parser.proxies.proxy import Proxy
-
-
-HEADERS = {
-    "sec-ch-ua-platform": '"Windows"',
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-    "sec-ch-ua": '"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"',
-    "sec-ch-ua-mobile": "?0",
-}
 
 
 class HttpClient:
@@ -42,7 +34,14 @@ class HttpClient:
             impersonate="chrome",
         )
 
-        session.headers.update(HEADERS)
+        headers = {
+            "sec-ch-ua-platform": '"Windows"',
+            "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          f"AppleWebKit/537.36 (KHTML, like Gecko) "
+                          f"Chrome/{random.randint(130, 147)}.0.0.0 Safari/537.36",
+        }
+
+        session.headers.update(headers)
 
         proxy = self.proxy.get_httpx_proxy()
         if proxy:

@@ -49,8 +49,10 @@ class AvitoParse:
         self.http = HttpClient(
             proxy=self.proxy,
             cookies=self.cookies_provider,
-            timeout=20,
+            timeout=config.timeout,
             max_retries=self.config.max_count_of_retry,
+            retry_delay=config.retry_delay,
+            block_threshold=config.block_threshold
         )
         self.ads_filter = AdsFilter(config=config, is_viewed_fn=self.is_viewed)
         log_config(config=self.config, version=VERSION)

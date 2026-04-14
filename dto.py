@@ -51,4 +51,8 @@ class AvitoConfig:
     use_own_cookies: bool = False
     parse_phone: bool = False
     proxy_notifier: str = None
+    tg_only_text: bool = False
+    retry_delay: int = 5
+    timeout: int = 20
+    block_threshold: int = 3
 

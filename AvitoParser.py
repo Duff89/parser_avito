@@ -27,7 +27,7 @@ def main(page: ft.Page):
     page.window.min_height = 500
     page.padding = 20
 
-    page.window.center()
+    page.window.maximized = True
 
     is_run = False
     stop_event = threading.Event()
@@ -70,6 +70,10 @@ def main(page: ft.Page):
         use_own_account.value = config.use_own_cookies
         parse_phone.value = config.parse_phone
         proxy_notifier.value = config.proxy_notifier
+        tg_only_text.value = config.tg_only_text
+        retry_delay.value = config.retry_delay
+        timeout.value = config.timeout
+        block_threshold.value = config.block_threshold
 
         page.update()
 
@@ -112,6 +116,10 @@ def main(page: ft.Page):
             "use_own_cookies": use_own_account.value,
             "parse_phone": parse_phone.value,
             "proxy_notifier": proxy_notifier.value,
+            "tg_only_text": tg_only_text.value,
+            "retry_delay": retry_delay.value,
+            "timeout": timeout.value,
+            "block_threshold": block_threshold.value
         }}
 
         save_avito_config(config)
@@ -390,21 +398,18 @@ def main(page: ft.Page):
     )
     count_page = ft.TextField(label="Количество страниц", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
                               height=40, )
-    pause_general = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, text_size=12,
-                                 height=40, tooltip=PAUSE_GENERAL_HELP)
-    pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
-                                       height=40, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
+
 
     max_age = ft.TextField(label="Макс. возраст объявления (в сек.)", width=400, text_size=12, height=40, expand=True,
                            tooltip=MAX_AGE_HELP)
-    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=300, text_size=12, height=40, expand=True,
-                                      tooltip=MAX_COUNT_OF_RETRY_HELP)
+
     tg_token = ft.TextField(label="Token telegram", width=400, text_size=12, height=50, expand=True,
                             tooltip=TG_TOKEN_HELP)
     tg_chat_id = ft.TextField(label="Chat id telegram. Можно несколько через Enter", width=400,
                               multiline=True, expand=True, text_size=12, height=50, tooltip=TG_CHAT_ID_HELP)
     proxy_notifier = ft.TextField(label="Прокси для tg", width=400,
                               multiline=False, expand=True, text_size=12, height=50, tooltip=PROXY_NOTIFIER_HELP)
+    tg_only_text = ft.Checkbox("Присылать только текст без изображений", value=False, tooltip=TG_ONLY_TEXT_HELP)
     btn_test_tg = ft.ElevatedButton(text="Проверить tg", disabled=False, on_click=telegram_log_test, expand=True,
                                     tooltip=BTN_TEST_TG_HELP)
     vk_token = ft.TextField(label="Token VK (сообщества)", width=400, text_size=12, height=50, expand=True,
@@ -485,9 +490,19 @@ def main(page: ft.Page):
         text_size=12,
         height=50,
     )
-    start_btn = ft.FilledButton("Старт", width=800, on_click=start_parser, expand=True)
-    stop_btn = ft.OutlinedButton("Стоп", width=980, on_click=stop_parser, visible=False,
-                                 style=ft.ButtonStyle(bgcolor=ft.colors.RED_400), expand=True)
+    start_btn = ft.FilledButton(
+        "Старт",
+        on_click=start_parser,
+        expand=True
+    )
+
+    stop_btn = ft.OutlinedButton(
+        "Стоп",
+        on_click=stop_parser,
+        visible=False,
+        style=ft.ButtonStyle(bgcolor=ft.colors.RED_400),
+        expand=True
+    )
     console_widget = ft.ListView(
         expand=True,
         spacing=2,
@@ -513,6 +528,22 @@ def main(page: ft.Page):
 
     save_xlsx = ft.Checkbox(label="Сохранять в Excel", value=True,
                               tooltip=SAVE_XLSX_HELP)
+
+    # Паузы и повторы
+    pause_general = ft.TextField(label="Пауза в секундах между повторами", width=400, expand=True, text_size=12,
+                                 height=40, tooltip=PAUSE_GENERAL_HELP)
+    pause_between_links = ft.TextField(label="Пауза в секундах между каждой ссылкой", width=400, text_size=12,
+                                       height=40, expand=True, tooltip=PAUSE_BETWEEN_LINKS_HELP)
+    max_count_of_retry = ft.TextField(label="Макс. кол-во повторов", width=300, text_size=12, height=40, expand=True,
+                                      tooltip=MAX_COUNT_OF_RETRY_HELP)
+    retry_delay = ft.TextField(label="Пауза между неудачными повторами", width=300, text_size=12, height=40, expand=True,
+                                      tooltip=RETRY_DELAY_HELP)
+    timeout = ft.TextField(label="Таймаут для запросов", width=300, text_size=12, height=40, expand=True,
+                                      tooltip=TIMEOUT_HELP)
+    block_threshold = ft.TextField(label="Попыток перед разблокировкой", width=300, text_size=12, height=40, expand=True,
+                                      tooltip=BLOCK_THRESHOLD_HELP)
+
+
     accordion = ft.ExpansionPanelList(
         expand_icon_color=ft.colors.GREEN_300,
         elevation=2,
@@ -544,7 +575,7 @@ def main(page: ft.Page):
                     ft.Text("Telegram", weight=ft.FontWeight.BOLD),
                     ft.Row([tg_token, tg_chat_id]),
                     ft.Row([proxy_notifier, ]),
-                    btn_test_tg,
+                    ft.Row([btn_test_tg, tg_only_text]),
 
                     ft.Divider(),
 
@@ -636,8 +667,8 @@ def main(page: ft.Page):
             panel(
                 "⚙️ Поведение парсера",
                 [
-                    ft.Row([pause_general, pause_between_links]),
-                    max_count_of_retry,
+                    ft.Row([pause_general, pause_between_links, block_threshold]),
+                    ft.Row([max_count_of_retry, retry_delay, timeout]),
                     ft.Row([one_time_start, one_file_for_link]),
                     ft.Row([parse_views,
                             #parse_phone,

@@ -7,10 +7,11 @@ from models import Item
 
 
 class TelegramNotifier(Notifier):
-    def __init__(self, bot_token: str, chat_id: str, proxy: str = None):
+    def __init__(self, bot_token: str, chat_id: str, proxy: str = None, only_text: bool = False):
         self.bot_token = bot_token
         self.chat_id = chat_id
         self.proxy = self.get_proxy(proxy=proxy)
+        self.only_text = only_text
 
     @staticmethod
     def get_proxy(proxy: str = None):
@@ -38,8 +39,24 @@ class TelegramNotifier(Notifier):
         send_with_retries(_send)
 
     def notify_ad(self, ad: Item):
+        message = self.format(ad)
+
         def _send():
-            message = self.format(ad)
+            # если включен only_text — отправляем без картинки
+            if self.only_text:
+                return requests.post(
+                    f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
+                    json={
+                        "chat_id": self.chat_id,
+                        "text": message,
+                        "parse_mode": "MarkdownV2",
+                        "disable_web_page_preview": True,
+                    },
+                    proxies=self.proxy,
+                    timeout=10,
+                )
+
+            # иначе отправляем с фото
             return requests.post(
                 f"https://api.telegram.org/bot{self.bot_token}/sendPhoto",
                 json={

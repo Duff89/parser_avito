@@ -32,3 +32,7 @@ cookies_api_key = ""
 use_own_cookies = false
 parse_phone = false
 proxy_notifier = ""
+tg_only_text = false
+retry_delay = 5
+timeout = 20
+block_threshold = 3
