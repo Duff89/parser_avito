@@ -117,9 +117,9 @@ def main(page: ft.Page):
             "parse_phone": parse_phone.value,
             "proxy_notifier": proxy_notifier.value,
             "tg_only_text": tg_only_text.value,
-            "retry_delay": retry_delay.value,
-            "timeout": timeout.value,
-            "block_threshold": block_threshold.value
+            "retry_delay": to_int_safe(retry_delay.value, 5),
+            "timeout": to_int_safe(timeout.value, 20),
+            "block_threshold": to_int_safe(block_threshold.value, 3)
         }}
 
         save_avito_config(config)
@@ -396,7 +396,7 @@ def main(page: ft.Page):
         tooltip=KEYWORD_BLACK_INPUT_HELP,
         text_size=12, height=60,
     )
-    count_page = ft.TextField(label="Количество страниц", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
+    count_page = ft.TextField(label="Количество страниц (пока только 1)", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
                               height=40, )
 
 
