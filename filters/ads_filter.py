@@ -83,15 +83,17 @@ class AdsFilter:
         return [ad for ad in ads if not getattr(ad, "isReserved", False)]
 
     def _filter_by_promotion(self, ads: List[Item]) -> List[Item]:
-        if not self.config.ignore_promotion:
-            return ads
         for ad in ads:
             ad.isPromotion = any(
                 v.get("title") == "Продвинуто"
                 for step in (ad.iva or {}).get("DateInfoStep", [])
-                for v in step.payload.get("vas", [])
+                for v in (step.payload or {}).get("vas", [])
             )
-        return [ad for ad in ads if not ad.isPromotion]
+
+        if self.config.ignore_promotion:
+            return [ad for ad in ads if not ad.isPromotion]
+
+        return ads
 
     @staticmethod
     def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:
