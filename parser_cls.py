@@ -1,10 +1,8 @@
-import html
 import json
 import random
 import re
 import time
 from datetime import datetime, timedelta
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -22,6 +20,7 @@ from parser.cookies.factory import build_cookies_provider
 from parser.export.factory import build_result_storage
 from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
+from utils.build_api_params import build_api_params
 from utils.parse_phone import ParsePhone
 from version import VERSION
 
@@ -81,6 +80,23 @@ class AvitoParse:
             logger.warning(f"Ошибка при запросе {url}: {err}")
             return None
 
+    def fetch_api_data(self, base_params: dict, page: int, context: str):
+        params = base_params.copy()
+
+        params.update({
+            'p': str(page),
+            'context': context,
+            'updateListOnly': 'true',
+        })
+
+        response = self.http.request(
+            "GET",
+            "https://www.avito.ru/web/1/js/items",
+            params=params
+        )
+
+        return response.json()
+
     def parse(self):
         if not self.config.one_file_for_link:
             # один storage на весь парсинг
@@ -95,6 +111,9 @@ class AvitoParse:
                     link_index=_index
                 )
             ads_in_link = []
+            api_params = None
+            context = None
+
             for i in range(0, self.config.count):
                 logger.info(f"page={i + 1}")
                 if self.stop_event and self.stop_event.is_set():
@@ -102,7 +121,14 @@ class AvitoParse:
                 if DEBUG_MODE:
                     html_code = open("may.txt", "r", encoding="utf-8").read()
                 else:
-                    html_code = self.fetch_data(url=url)
+                    if i == 0:
+                        html_code = self.fetch_data(url=url)
+                    else:
+                        if api_params and context:
+                            json_data = self.fetch_api_data(api_params, page=i + 1, context=context)
+                        else:
+                            logger.info("Т.к. 1-я страница была неудачной - дальше смотреть не можем")
+                            break
 
                 if not html_code:
                     logger.warning(
@@ -112,8 +138,18 @@ class AvitoParse:
 
                 data_from_page = self.find_json_on_page(html_code=html_code)
 
+                if i == 0:
+                    search_core = data_from_page.get("searchCore") or {}
+                    context = data_from_page.get("context")
+
+                    api_params = build_api_params(search_core)
+
                 try:
-                    catalog = data_from_page.get("catalog") or {}
+                    if i == 0:
+                        catalog = data_from_page.get("catalog") or {}
+                    else:
+                        catalog = json_data.get("catalog") or json_data.get("result", {}).get("catalog") or {}
+
                     ads_models = ItemsResponse(**catalog)
                 except ValidationError as err:
                     logger.error(f"При валидации объявлений произошла ошибка: {err}")
@@ -124,6 +160,8 @@ class AvitoParse:
                 logger.info(f"Объявлений перед чисткой {len(ads)}")
 
                 ads = self._add_seller_to_ads(ads=ads)
+
+                ads = self._add_promotion_to_ads(ads=ads)
 
                 if not ads:
                     logger.info("Объявления закончились, заканчиваю работу с данной ссылкой")
@@ -142,8 +180,6 @@ class AvitoParse:
                 if filter_ads:
                     self.__save_viewed(ads=filter_ads)
                     ads_in_link.extend(filter_ads)
-
-                url = self.get_next_page_url(url=url)
 
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
@@ -172,7 +208,6 @@ class AvitoParse:
             for _script in html_code.select('script'):
 
                 script_type = _script.get('type')
-
 
                 if data_type == 'mime':
                     for script in html_code.select('script'):
@@ -272,23 +307,6 @@ class AvitoParse:
             self.db_handler.add_record_from_page(ads=ads)
         except Exception as err:
             logger.info(f"При сохранении в БД ошибка {err}")
-
-    def get_next_page_url(self, url: str):
-        """Получает следующую страницу"""
-        try:
-            url_parts = urlparse(url)
-            query_params = parse_qs(url_parts.query)
-            current_page = int(query_params.get('p', [1])[0])
-            query_params['p'] = current_page + 1
-            if self.config.one_time_start:
-                logger.debug(f"Страница {current_page}")
-
-            new_query = urlencode(query_params, doseq=True)
-            next_url = urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query,
-                                   url_parts.fragment))
-            return next_url
-        except Exception as err:
-            logger.error(f"Не смог сформировать ссылку на следующую страницу для {url}. Ошибка: {err}")
 
 
 if __name__ == "__main__":

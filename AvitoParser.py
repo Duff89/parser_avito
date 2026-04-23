@@ -396,7 +396,7 @@ def main(page: ft.Page):
         tooltip=KEYWORD_BLACK_INPUT_HELP,
         text_size=12, height=60,
     )
-    count_page = ft.TextField(label="Количество страниц (пока только 1)", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
+    count_page = ft.TextField(label="Количество страниц", width=450, expand=True, tooltip=COUNT_PAGE_HELP, text_size=12,
                               height=40, )
 
 

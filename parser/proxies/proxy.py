@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import requests
+from loguru import logger
 
 
 class Proxy(ABC):
@@ -41,4 +42,9 @@ class MobileProxy(Proxy):
 
     def handle_block(self):
         # делаем запрос на смену IP
-        requests.get(self.change_ip_url, timeout=10)
+        params = {
+            "format": "json"
+        }
+        res = requests.get(self.change_ip_url, params=params, timeout=10)
+        if res.status_code == 200:
+            logger.success(f"новый IP {res.json().get('new_ip')}")

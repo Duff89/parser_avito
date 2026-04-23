@@ -34,11 +34,23 @@ class HttpClient:
             impersonate="chrome",
         )
 
+        _chrome_version = str(random.randint(130, 147))
         headers = {
-            "sec-ch-ua-platform": '"Windows"',
+            'accept': 'application/json',
+            'accept-language': 'ru-RU,ru;q=0.9',
+            'priority': 'u=1, i',
+            'referer': 'https://www.avito.ru',
+            'sec-ch-ua': f'"Google Chrome";v="{_chrome_version}", "Not.A/Brand";v="8", "Chromium";v="{_chrome_version}"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'x-requested-with': 'XMLHttpRequest',
+            'x-source': 'client-browser',
             "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           f"AppleWebKit/537.36 (KHTML, like Gecko) "
-                          f"Chrome/{random.randint(130, 147)}.0.0.0 Safari/537.36",
+                          f"Chrome/{_chrome_version}.0.0.0 Safari/537.36",
         }
 
         session.headers.update(headers)
@@ -79,12 +91,12 @@ class HttpClient:
                     self._block_attempts += 1
 
                     logger.warning(
-                        f"Blocked request ({response.status_code}), "
-                        f"attempt {self._block_attempts}"
+                        f"Запрос заблокирован ({response.status_code}), "
+                        f"попытка {self._block_attempts}"
                     )
 
                     if self._block_attempts >= self.block_threshold:
-                        logger.warning("Block threshold reached, handling block")
+                        logger.warning("Достигнут лимит блокировок, запускается обработка")
 
                         if self.cookies:
                             self.cookies.handle_block()
