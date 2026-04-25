@@ -186,7 +186,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
         try:
             res = requests.post(
                 f"{API_URL}/cookies/",
-                json={"api_key": self.api_key},
+                json={"api_key": self.api_key, "full_format": True},
                 headers=self.headers,
                 timeout=15,
             )

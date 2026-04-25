@@ -34,9 +34,9 @@ class HttpClient:
             impersonate="chrome",
         )
 
-        _chrome_version = str(random.randint(130, 147))
+        _chrome_version = str(random.randint(140, 147))
         headers = {
-            'accept': 'application/json',
+            'accept': '*/*',
             'accept-language': 'ru-RU,ru;q=0.9',
             'priority': 'u=1, i',
             'referer': 'https://www.avito.ru',
@@ -48,7 +48,7 @@ class HttpClient:
             'sec-fetch-site': 'same-origin',
             'x-requested-with': 'XMLHttpRequest',
             'x-source': 'client-browser',
-            "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "user-agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           f"AppleWebKit/537.36 (KHTML, like Gecko) "
                           f"Chrome/{_chrome_version}.0.0.0 Safari/537.36",
         }
