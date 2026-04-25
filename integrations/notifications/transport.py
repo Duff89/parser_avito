@@ -34,6 +34,26 @@ def send_with_retries(
             response.raise_for_status()
             return response
 
+        except requests.HTTPError as e:
+            resp = e.response
+            # 4xx errors other than 429 are client errors — retrying won't help
+            if resp is not None and 400 <= resp.status_code < 500 and resp.status_code not in RETRY_STATUS_CODES:
+                logger.error(
+                    f"[notify] non-retryable client error {resp.status_code}, aborting"
+                )
+                raise
+
+            logger.warning(
+                f"[notify retry] attempt {attempt}/{retries}: {e}"
+            )
+
+            if attempt >= retries:
+                logger.error("[notify retry] retries exhausted")
+                raise
+
+            sleep_time = delay * (backoff ** (attempt - 1))
+            time.sleep(sleep_time)
+
         except requests.RequestException as e:
             logger.warning(
                 f"[notify retry] attempt {attempt}/{retries}: {e}"
