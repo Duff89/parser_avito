@@ -30,24 +30,13 @@ class HttpClient:
         self._block_attempts = 0
 
     def _build_client(self) -> requests.Session:
+        _impersonate = random.choice(["tor", "edge", "firefox", "safari"])
         session = requests.Session(
-            impersonate="chrome",
+            impersonate=_impersonate,
         )
 
         _chrome_version = str(random.randint(140, 147))
         headers = {
-            'accept': '*/*',
-            'accept-language': 'ru-RU,ru;q=0.9',
-            'priority': 'u=1, i',
-            'referer': 'https://www.avito.ru',
-            'sec-ch-ua': f'"Google Chrome";v="{_chrome_version}", "Not.A/Brand";v="8", "Chromium";v="{_chrome_version}"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-            'x-requested-with': 'XMLHttpRequest',
-            'x-source': 'client-browser',
             "user-agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           f"AppleWebKit/537.36 (KHTML, like Gecko) "
                           f"Chrome/{_chrome_version}.0.0.0 Safari/537.36",
