@@ -58,7 +58,12 @@ class AdsFilter:
     def _filter_by_address(self, ads: List[Item]) -> List[Item]:
         if not self.config.geo:
             return ads
-        return [ad for ad in ads if self.config.geo in getattr(ad, "geo", {}).get("formattedAddress", "")]
+
+        expected_geo = self.config.geo.strip().casefold()
+        return [
+            ad for ad in ads
+            if expected_geo in self._get_formatted_address(ad).casefold()
+        ]
 
     def _filter_by_seller(self, ads: List[Item]) -> List[Item]:
         if not self.config.seller_black_list:
@@ -97,3 +102,12 @@ class AdsFilter:
     def _is_phrase_in_ads(ad: Item, phrases: list) -> bool:
         full_text = ((ad.title or "") + (ad.description or "")).lower()
         return any(phrase.lower() in full_text for phrase in phrases)
+
+    @staticmethod
+    def _get_formatted_address(ad: Item) -> str:
+        geo = getattr(ad, "geo", None)
+        if not geo:
+            return ""
+        if isinstance(geo, dict):
+            return str(geo.get("formattedAddress") or "")
+        return str(getattr(geo, "formattedAddress", "") or "")

@@ -13,13 +13,13 @@ class SQLiteDBHandler:
         return cls._instance
 
     def __init__(self, db_name="database.db"):
-        if not hasattr(self, "_initialized"):
+        if not hasattr(self, "_initialized") or self.db_name != db_name:
             self.db_name = db_name
             self._create_table()
             self._initialized = True
 
     def _create_table(self):
-        """Создает таблицу viewed, если она не существует."""
+        """Создает таблицу viewed и индекс уникальности, если они не существуют."""
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -30,6 +30,22 @@ class SQLiteDBHandler:
                 )
                 """
             )
+            cursor.execute(
+                """
+                DELETE FROM viewed
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid)
+                    FROM viewed
+                    GROUP BY id, price
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_viewed_id_price
+                ON viewed (id, price)
+                """
+            )
             conn.commit()
 
     def add_record(self, ad: Item):
@@ -38,7 +54,7 @@ class SQLiteDBHandler:
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO viewed (id, price) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO viewed (id, price) VALUES (?, ?)",
                 (ad.id, ad.priceDetailed.value),
             )
             conn.commit()
@@ -46,12 +62,14 @@ class SQLiteDBHandler:
     def add_record_from_page(self, ads: list[Item]):
         """Добавляет несколько записей в таблицу viewed."""
         records = [(ad.id, ad.priceDetailed.value) for ad in ads]
+        if not records:
+            return
 
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.executemany(
                 """
-                INSERT OR REPLACE INTO viewed (id, price)
+                INSERT OR IGNORE INTO viewed (id, price)
                 VALUES (?, ?)
                 """,
                 records,

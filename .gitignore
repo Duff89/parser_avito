@@ -1,2 +1,10 @@
 # created by virtualenv automatically
 .secret.txt
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/
+result/
+database.db
+venv/
+.venv/

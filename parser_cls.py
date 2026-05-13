@@ -194,7 +194,6 @@ class AvitoParse:
 
         if self.config.one_time_start:
             self.notifier.notify(message="Парсинг Авито завершён. Все ссылки обработаны")
-            self.stop_event = True
 
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
@@ -262,8 +261,7 @@ class AvitoParse:
         return ads
 
     def parse_phone(self, ads: list[Item]) -> list[Item]:
-        if not self.config.parse_phone or self.config.parse_phone:
-            # future feat
+        if not self.config.parse_phone:
             return ads
 
         try:
