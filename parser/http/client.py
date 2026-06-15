@@ -30,12 +30,12 @@ class HttpClient:
         self._block_attempts = 0
 
     def _build_client(self) -> requests.Session:
-        _impersonate = random.choice(["tor", "edge", "firefox", "safari"])
+        _impersonate = random.choice(["chrome", "edge", "firefox", "safari"])
         session = requests.Session(
             impersonate=_impersonate,
         )
 
-        _chrome_version = str(random.randint(140, 147))
+        _chrome_version = str(random.randint(142, 147))
         headers = {
             "user-agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                           f"AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -106,4 +106,4 @@ class HttpClient:
                 logger.warning(f"Request error (attempt {attempt}): {e}")
                 time.sleep(self.retry_delay)
 
-        raise RuntimeError("HTTP request failed after retries") from last_exc
+        raise RuntimeError("HTTP запросы были неуспешными") from last_exc

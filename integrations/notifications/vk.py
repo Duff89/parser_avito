@@ -21,7 +21,7 @@ class VKNotifier(Notifier):
                 "https://api.vk.com/method/messages.send",
                 headers=headers,
                 data={
-                    "peer_id": self.user_id,
+                    "user_id": self.user_id,
                     "random_id": 0,
                     "message": message,
                     "v": "5.199"
@@ -41,7 +41,7 @@ class VKNotifier(Notifier):
             if _image_url:
                 attachment = self.__upload_photo_to_vk(_image_url, str(self.user_id))
             payload = {
-                "peer_id": self.user_id,
+                "user_id": self.user_id,
                 "random_id": 0,
                 "message": message,
                 "v": "5.199"
