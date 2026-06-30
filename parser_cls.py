@@ -119,7 +119,7 @@ class AvitoParse:
                 if self.stop_event and self.stop_event.is_set():
                     return
                 if DEBUG_MODE:
-                    html_code = open("may.txt", "r", encoding="utf-8").read()
+                    html_code = open("debug.txt", "r", encoding="utf-8").read()
                 else:
                     if i == 0:
                         html_code = self.fetch_data(url=url)
@@ -213,8 +213,8 @@ class AvitoParse:
                     for script in html_code.select('script'):
                         if script.get('type') == 'mime/invalid' and script.get('data-mfe-state') == 'true' and 'sandbox' not in script.text:
                             data = json.loads(html_lib.unescape(script.text))
-                            if data.get('i18n', {}).get('hasMessages', {}):
-                                return data.get('state', {}).get('data', {})
+                            if data.get('i18n', {}).get('hasMessages'):
+                                return data.get('loaderData', {}).get("data", {})
 
         except Exception as err:
             logger.error(f"Ошибка при поиске информации на странице: {err}")
