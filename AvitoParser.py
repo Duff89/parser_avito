@@ -67,6 +67,7 @@ def main(page: ft.Page):
         use_webdriver.value = config.use_webdriver
         use_bypass_api.value = config.use_bypass_api
         cookies_api_key.value = config.cookies_api_key
+        purchase_cooldown.value = str(config.purchase_cooldown)
         use_own_account.value = config.use_own_cookies
         parse_phone.value = config.parse_phone
         proxy_notifier.value = config.proxy_notifier
@@ -113,6 +114,7 @@ def main(page: ft.Page):
             "use_webdriver": use_webdriver.value,
             "use_bypass_api": use_bypass_api.value,
             "cookies_api_key": cookies_api_key.value,
+            "purchase_cooldown": to_int_safe(purchase_cooldown.value, 600),
             "use_own_cookies": use_own_account.value,
             "parse_phone": parse_phone.value,
             "proxy_notifier": proxy_notifier.value,
@@ -445,6 +447,14 @@ def main(page: ft.Page):
         can_reveal_password=True,
         expand=True,
     )
+    purchase_cooldown = ft.TextField(
+        label="Пауза между покупками cookies (сек.)",
+        value="600",
+        width=250,
+        text_size=12,
+        height=40,
+        tooltip="Минимальное время между покупками новых cookies через spfa.ru (чтобы не сжечь баланс)",
+    )
     use_bypass_api = ft.Checkbox("Использовать spfa сервис", value=False)
     bypass_api_key_help_icon = ft.IconButton(
         icon=ft.icons.HELP_OUTLINE,
@@ -598,7 +608,10 @@ def main(page: ft.Page):
                                         ft.Text("Сторонний сервис (spfa.ru)", size=14, weight=ft.FontWeight.W_500),
                                     ]),
                                     ft.Container(
-                                        content=ft.Row([use_bypass_api, cookies_api_key, bypass_api_key_help_icon]),
+                                        content=ft.Column([
+                                            ft.Row([use_bypass_api, cookies_api_key, bypass_api_key_help_icon]),
+                                            purchase_cooldown,
+                                        ]),
                                         margin=ft.margin.only(left=25, top=5),
                                     ),
                                 ]),

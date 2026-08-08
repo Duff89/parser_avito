@@ -3,6 +3,7 @@ import random
 import re
 import time
 from datetime import datetime, timedelta
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -20,7 +21,7 @@ from parser.cookies.factory import build_cookies_provider
 from parser.export.factory import build_result_storage
 from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
-from utils.build_api_params import build_api_params
+from parser.url_converter import AvitoUrlConverter
 from utils.parse_phone import ParsePhone
 from version import VERSION
 
@@ -41,6 +42,7 @@ class AvitoParse:
         self.db_handler = SQLiteDBHandler()
         self.notifier = build_notifier(config=config)
         self.result_storage = None
+        self.url_converter = AvitoUrlConverter()
         self.stop_event = stop_event
         self.headers = HEADERS
         self.good_request_count = 0
@@ -80,106 +82,125 @@ class AvitoParse:
             logger.warning(f"Ошибка при запросе {url}: {err}")
             return None
 
-    def fetch_api_data(self, base_params: dict, page: int, context: str):
-        params = base_params.copy()
-
-        params.update({
-            'p': str(page),
-            'context': context,
-            'updateListOnly': 'true',
-        })
-
-        response = self.http.request(
-            "GET",
-            "https://www.avito.ru/web/1/js/items",
-            params=params
+    @staticmethod
+    def _api_url_for_page(api_url: str, page: int) -> str:
+        parts = urlsplit(api_url)
+        query = parse_qsl(parts.query, keep_blank_values=True)
+        page_key = next(
+            (key for key, _ in query if key in {"p", "page"}),
+            "p",
+        )
+        query = [(key, value) for key, value in query if key != page_key]
+        query.append((page_key, str(page)))
+        return urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
         )
 
-        return response.json()
+    def fetch_api_data(self, api_url: str, page: int) -> dict | None:
+        if self.stop_event and self.stop_event.is_set():
+            return None
 
+        page_url = self._api_url_for_page(api_url, page)
+        try:
+            response = self.http.request("GET", page_url)
+            self.good_request_count += 1
+            return response.json()
+        except Exception as err:
+            self.bad_request_count += 1
+            logger.warning(f"Ошибка при запросе API {page_url}: {err}")
+            return None
+
+    @staticmethod
+    def _extract_api_catalog(payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            return {}
+
+        result = payload.get("result")
+        candidates = [
+            payload.get("catalog"),
+            result.get("catalog") if isinstance(result, dict) else None,
+            result,
+            payload,
+        ]
+        return next(
+            (
+                candidate
+                for candidate in candidates
+                if isinstance(candidate, dict)
+                and isinstance(candidate.get("items"), list)
+            ),
+            {},
+        )
     def parse(self):
         if not self.config.one_file_for_link:
-            # один storage на весь парсинг
             self.result_storage = build_result_storage(config=self.config)
 
-        for _index, url in enumerate(self.config.urls):
+        api_urls = {}
+        for source_url in self.config.urls:
+            if self.stop_event and self.stop_event.is_set():
+                return
+            try:
+                api_urls[source_url] = self.url_converter.convert(source_url)
+            except Exception as err:
+                logger.error(
+                    f"Не удалось преобразовать ссылку Avito в API URL "
+                    f"{source_url}: {err}"
+                )
+
+        for link_index, source_url in enumerate(self.config.urls):
+            api_url = api_urls.get(source_url)
+            if not api_url:
+                continue
 
             if self.config.one_file_for_link:
-                # storage для этой ссылки
                 self.result_storage = build_result_storage(
                     config=self.config,
-                    link_index=_index
+                    link_index=link_index,
                 )
-            ads_in_link = []
-            api_params = None
-            context = None
 
-            for i in range(0, self.config.count):
-                logger.info(f"page={i + 1}")
+            ads_in_link = []
+            for page in range(1, self.config.count + 1):
+                logger.info(f"page={page}")
                 if self.stop_event and self.stop_event.is_set():
                     return
-                if DEBUG_MODE:
-                    html_code = open("debug.txt", "r", encoding="utf-8").read()
-                else:
-                    if i == 0:
-                        html_code = self.fetch_data(url=url)
-                    else:
-                        if api_params and context:
-                            json_data = self.fetch_api_data(api_params, page=i + 1, context=context)
-                        else:
-                            logger.info("Т.к. 1-я страница была неудачной - дальше смотреть не можем")
-                            break
 
-                if not html_code:
+                json_data = self.fetch_api_data(api_url=api_url, page=page)
+                if not json_data:
                     logger.warning(
-                        f"Не удалось получить HTML для {url}, пробую заново через {self.config.pause_between_links} сек.")
+                        f"Не удалось получить данные API для {source_url}, "
+                        f"повтор через {self.config.pause_between_links} сек."
+                    )
                     time.sleep(self.config.pause_between_links)
                     continue
 
-                data_from_page = self.find_json_on_page(html_code=html_code)
-
-                if i == 0:
-                    search_core = data_from_page.get("searchCore") or {}
-                    context = data_from_page.get("context")
-
-                    api_params = build_api_params(search_core)
-
+                catalog = self._extract_api_catalog(json_data)
                 try:
-                    if i == 0:
-                        catalog = data_from_page.get("catalog") or {}
-                    else:
-                        catalog = json_data.get("catalog") or json_data.get("result", {}).get("catalog") or {}
-
                     ads_models = ItemsResponse(**catalog)
                 except ValidationError as err:
-                    logger.error(f"При валидации объявлений произошла ошибка: {err}")
+                    logger.error(
+                        f"При валидации объявлений произошла ошибка: {err}"
+                    )
                     continue
 
                 ads = self._clean_null_ads(ads=ads_models.items)
-
-                logger.info(f"Объявлений перед чисткой {len(ads)}")
-
+                logger.info(f"Объявлений перед фильтрацией {len(ads)}")
                 ads = self._add_seller_to_ads(ads=ads)
-
                 ads = self._add_promotion_to_ads(ads=ads)
 
                 if not ads:
-                    logger.info("Объявления закончились, заканчиваю работу с данной ссылкой")
+                    logger.info(
+                        "Объявления закончились, завершаю работу с данной ссылкой"
+                    )
                     break
 
-                filter_ads = self.filter_ads(ads=ads)
+                filtered_ads = self.filter_ads(ads=ads)
+                self.notifier.notify_many(ads=filtered_ads)
+                filtered_ads = self.parse_views(ads=filtered_ads)
+                filtered_ads = self.parse_phone(ads=filtered_ads)
 
-                self.notifier.notify_many(ads=filter_ads)
-
-                # Просмотры
-                filter_ads = self.parse_views(ads=filter_ads)
-
-                # Телефоны
-                filter_ads = self.parse_phone(ads=filter_ads)
-
-                if filter_ads:
-                    self.__save_viewed(ads=filter_ads)
-                    ads_in_link.extend(filter_ads)
+                if filtered_ads:
+                    self.__save_viewed(ads=filtered_ads)
+                    ads_in_link.extend(filtered_ads)
 
                 logger.info(f"Пауза {self.config.pause_between_links} сек.")
                 time.sleep(self.config.pause_between_links)
@@ -190,12 +211,16 @@ class AvitoParse:
             else:
                 logger.info("Сохранять нечего")
 
-        logger.info(f"Хорошие запросы: {self.good_request_count}шт, плохие: {self.bad_request_count}шт")
+        logger.info(
+            f"Хорошие запросы: {self.good_request_count}шт, "
+            f"плохие: {self.bad_request_count}шт"
+        )
 
         if self.config.one_time_start:
-            self.notifier.notify(message="Парсинг Авито завершён. Все ссылки обработаны")
+            self.notifier.notify(
+                message="Парсинг Авито завершён. Все ссылки обработаны"
+            )
             self.stop_event = True
-
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
         return [ad for ad in ads if ad.id]
@@ -263,7 +288,7 @@ class AvitoParse:
 
     def parse_phone(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_phone or self.config.parse_phone:
-            # future feat
+            # future feat, not ready yet
             return ads
 
         try:

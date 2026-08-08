@@ -12,14 +12,18 @@ API_URL = "https://spfa.ru/api"
 
 class ExternalApiCookiesProvider(CookiesProvider):
     MAX_STATUS_HISTORY = 20
-    PURCHASE_COOLDOWN = 600  # 10 минут
 
-    def __init__(self, api_key: str, storage_path: str | Path = "storage/cookies_external.json"):
-        self.api_key = api_key
+    def __init__(self, config, storage_path: str | Path = "storage/cookies_external.json"):
+        self.api_key = config.cookies_api_key
+        self.proxy = config.proxy_string
+        self.purchase_cooldown = config.purchase_cooldown
         self.storage_path = Path(storage_path)
 
         self.last_id: str | None = None
         self.last_cookies: dict | None = None
+        self.user_agent: str | None = None
+        self.fingerprint: dict | None = None
+        self.mobile: bool | None = None
 
         self.unblock_started_at: float | None = None
         self.UNBLOCK_TIMEOUT = 300  # 5 минут
@@ -50,17 +54,33 @@ class ExternalApiCookiesProvider(CookiesProvider):
 
         return self._get_new_cookies()
 
+    def get_user_agent(self) -> str | None:
+        if not self.last_cookies or not self.user_agent:
+            self._get_new_cookies()
+        return self.user_agent
+
+    def get_fingerprint(self) -> dict | None:
+        if not self.last_cookies or not self.fingerprint:
+            self._get_new_cookies()
+        return self.fingerprint
+
     def update(self, response):
         """
         Обновляем историю кодов ответа.
         Сохраняем на диск только при изменении или плохом коде.
         """
-        if not response:
+        if response is None:
             return
 
         code = getattr(response, "status_code", None)
         if code is None:
             return
+
+        response_cookies = dict(response.cookies)
+        if response_cookies:
+            if self.last_cookies is None:
+                self.last_cookies = {}
+            self.last_cookies.update(response_cookies)
 
         last_code = self.status_history[-1] if self.status_history else None
         self.status_history.append(code)
@@ -71,7 +91,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
         # 1) код изменился относительно последнего
         # 2) код плохой (403 или 429)
         # 3) первый код (нет истории)
-        if code != last_code or code in (403, 429) or last_code is None:
+        if response_cookies or code != last_code or code in (403, 429, 439) or last_code is None:
             self._save_to_disk()
 
     def handle_block(self):
@@ -89,17 +109,18 @@ class ExternalApiCookiesProvider(CookiesProvider):
             return
 
         # ---- Проверяем историю кодов и время последней покупки ----
-        if self.last_purchase_at and (now - self.last_purchase_at) < self.PURCHASE_COOLDOWN:  # 10 минут
+        if self.last_purchase_at and (now - self.last_purchase_at) < self.purchase_cooldown:
             logger.info(
-                f"⏱ Последняя покупка была менее 10 минут назад | id={self.last_id} | пытаемся разблокировать"
+                f"⏱ С последней покупки прошло меньше {self.purchase_cooldown} сек. "
+                f"| id={self.last_id} | пытаемся разблокировать"
             )
             # идем к разблокировке
         elif (
                 len(self.status_history) >= self.MAX_STATUS_HISTORY
-                and all(code in (403, 429) for code in self.status_history[-self.MAX_STATUS_HISTORY:])
+                and all(code in (403, 429, 439) for code in self.status_history[-self.MAX_STATUS_HISTORY:])
         ):
             logger.warning(
-                "⚠️ Все последние 20 кодов плохие (403/429) — покупаем новые cookies"
+                "⚠️ Все последние 20 кодов плохие (403/429/439) — покупаем новые cookies"
             )
             self._get_new_cookies()
             return
@@ -128,9 +149,10 @@ class ExternalApiCookiesProvider(CookiesProvider):
                 json={
                     "id": self.last_id,
                     "api_key": self.api_key,
+                    "proxy": self.proxy
                 },
                 headers=self.headers,
-                timeout=15,
+                timeout=30,
             )
         except requests.RequestException as e:
             logger.error(
@@ -160,7 +182,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
         # ---- Фатальные ошибки ----
         elif res.status_code == 403:
             time.sleep(self.NOT_BALANCE)
-            logger.error("⛔ Доступ запрещён: неверный API key или нет прав")
+            logger.error("⛔ Доступ запрещён: неверный API key, нет прав или не хватает баланса")
 
         elif res.status_code == 404:
             time.sleep(self.PAUSE_FOR_ERROR)
@@ -185,12 +207,14 @@ class ExternalApiCookiesProvider(CookiesProvider):
 
         try:
             res = requests.post(
-                f"{API_URL}/cookies/",
+                f"{API_URL}/cookies/mobile/",
                 json={
                     "api_key": self.api_key,
+                    "mobile": True,
+                    "proxy": self.proxy
                 },
                 headers=self.headers,
-                timeout=15,
+                timeout=30,
             )
         except requests.RequestException as e:
             logger.error(f"❌ Не удалось связаться с сервисом cookies | ошибка={e}")
@@ -219,15 +243,36 @@ class ExternalApiCookiesProvider(CookiesProvider):
 
         # ---- Успешный ответ ----
         try:
-            data = res.json().get("results", {})
+            payload = res.json()
+            if not payload.get("success"):
+                raise RuntimeError("Сервис cookies вернул success=false")
+            data = payload.get("results", {})
         except ValueError:
             logger.error("❌ Сервер вернул некорректный JSON при покупке cookies")
             raise
 
         self.last_id = data.get("id")
         self.last_cookies = data.get("cookies")
+        self.fingerprint = data.get("fingerprint")
+        self.mobile = data.get("mobile")
 
-        if not self.last_id or not self.last_cookies:
+        fingerprint_headers = (
+            self.fingerprint.get("headers", {})
+            if isinstance(self.fingerprint, dict)
+            else {}
+        )
+        self.user_agent = data.get("user_agent") or fingerprint_headers.get("user-agent")
+
+        if (
+            not self.last_id
+            or not isinstance(self.last_cookies, dict)
+            or not self.last_cookies
+            or not self.user_agent
+            or not isinstance(self.fingerprint, dict)
+            or not self.fingerprint.get("impersonate")
+            or not isinstance(fingerprint_headers, dict)
+            or not fingerprint_headers
+        ):
             logger.error(f"❌ Ответ сервера без cookies | данные={data}")
             raise RuntimeError("Сервер вернул неполные данные cookies")
 
@@ -247,6 +292,9 @@ class ExternalApiCookiesProvider(CookiesProvider):
             payload = {
                 "id": self.last_id,
                 "cookies": self.last_cookies,
+                "user_agent": self.user_agent,
+                "fingerprint": self.fingerprint,
+                "mobile": self.mobile,
                 "saved_at": time.time(),
                 "status_history": self.status_history,
                 "last_purchase_at": self.last_purchase_at,
@@ -268,13 +316,16 @@ class ExternalApiCookiesProvider(CookiesProvider):
             data = json.loads(self.storage_path.read_text(encoding="utf-8"))
             self.last_id = data.get("id")
             self.last_cookies = data.get("cookies")
+            self.user_agent = data.get("user_agent")
+            self.fingerprint = data.get("fingerprint")
+            self.mobile = data.get("mobile")
             self.status_history = data.get("status_history", [])
             self.last_purchase_at = data.get("last_purchase_at")
 
-            if self.last_id and self.last_cookies:
+            if self.last_id and self.last_cookies and self.user_agent and self.fingerprint:
                 logger.info("Загружаем сохраненные cookies с диска")
             else:
-                logger.warning("Cookies файл есть, но нет id или cookies в нем")
+                logger.warning("Cookies файл есть, но нет id, cookies или user_agent в нем")
 
         except Exception as err:
             logger.warning(f"Не удалось загрузить cookies локально: {err}")
