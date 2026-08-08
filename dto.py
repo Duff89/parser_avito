@@ -47,6 +47,7 @@ class AvitoConfig:
     use_webdriver: bool = True
     use_bypass_api: bool = False
     cookies_api_key: str = None
+    purchase_cooldown: int = 600
     output_dir: Path = Path("result")
     use_own_cookies: bool = False
     parse_phone: bool = False
