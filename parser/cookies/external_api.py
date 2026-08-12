@@ -13,11 +13,17 @@ API_URL = "https://spfa.ru/api"
 class ExternalApiCookiesProvider(CookiesProvider):
     MAX_STATUS_HISTORY = 20
 
-    def __init__(self, config, storage_path: str | Path = "storage/cookies_external.json"):
+    def __init__(
+        self,
+        config,
+        storage_path: str | Path = "storage/cookies_external.json",
+        proxy=None,
+    ):
         self.api_key = config.cookies_api_key
         self.proxy = config.proxy_string
         self.purchase_cooldown = config.purchase_cooldown
         self.storage_path = Path(storage_path)
+        self.proxy_handler = proxy
 
         self.last_id: str | None = None
         self.last_cookies: dict | None = None
@@ -218,37 +224,40 @@ class ExternalApiCookiesProvider(CookiesProvider):
             )
         except requests.RequestException as e:
             logger.error(f"❌ Не удалось связаться с сервисом cookies | ошибка={e}")
+            self._handle_purchase_failure()
             raise
 
         # ---- Обработка HTTP ошибок ----
         if res.status_code == 401:
             logger.error("⛔ Не передан API key при запросе cookies")
-            time.sleep(self.PAUSE_FOR_ERROR)
+            self._handle_purchase_failure(self.PAUSE_FOR_ERROR)
             res.raise_for_status()
 
         if res.status_code == 403:
             logger.error("⛔ Доступ запрещён: неверный API key или недостаточно средств")
-            time.sleep(self.NOT_BALANCE)
+            self._handle_purchase_failure(self.NOT_BALANCE)
             res.raise_for_status()
 
         if res.status_code == 503:
             logger.warning("🚧 Сервис cookies временно недоступен (парсер не готов)")
-            time.sleep(self.PAUSE_FOR_ERROR)
+            self._handle_purchase_failure(self.PAUSE_FOR_ERROR)
             res.raise_for_status()
 
         if not res.ok:
             logger.error(f"❌ Ошибка при покупке cookies | статус={res.status_code} | тело={res.text}")
-            time.sleep(self.PAUSE_FOR_ERROR)
+            self._handle_purchase_failure(self.PAUSE_FOR_ERROR)
             res.raise_for_status()
 
         # ---- Успешный ответ ----
         try:
             payload = res.json()
             if not payload.get("success"):
+                self._handle_purchase_failure()
                 raise RuntimeError("Сервис cookies вернул success=false")
             data = payload.get("results", {})
         except ValueError:
             logger.error("❌ Сервер вернул некорректный JSON при покупке cookies")
+            self._handle_purchase_failure()
             raise
 
         self.last_id = data.get("id")
@@ -274,6 +283,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
             or not fingerprint_headers
         ):
             logger.error(f"❌ Ответ сервера без cookies | данные={data}")
+            self._handle_purchase_failure()
             raise RuntimeError("Сервер вернул неполные данные cookies")
 
         self.last_purchase_at = time.time()  # новое: сохраняем дату и время покупки
@@ -285,6 +295,18 @@ class ExternalApiCookiesProvider(CookiesProvider):
         logger.debug("💾 Cookies сохранены на диск")
         time.sleep(self.WAIT_FOR_NEW)
         return self.last_cookies
+
+    def _handle_purchase_failure(self, pause: int | None = None) -> None:
+        if self.proxy_handler is not None:
+            try:
+                self.proxy_handler.handle_block()
+            except Exception as err:
+                logger.warning(
+                    f"Не удалось сменить IP после ошибки получения cookies: {err}"
+                )
+
+        if pause is not None:
+            time.sleep(pause)
 
     def _save_to_disk(self):
         try:

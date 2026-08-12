@@ -38,7 +38,7 @@ class AvitoParse:
     ):
         self.config = config
         self.proxy = build_proxy(self.config)
-        self.cookies_provider = build_cookies_provider(config=config)
+        self.cookies_provider = build_cookies_provider(config=config, proxy=self.proxy)
         self.db_handler = SQLiteDBHandler()
         self.notifier = build_notifier(config=config)
         self.result_storage = None
@@ -90,8 +90,8 @@ class AvitoParse:
             (key for key, _ in query if key in {"p", "page"}),
             "p",
         )
-        query = [(key, value) for key, value in query if key != page_key]
-        query.append((page_key, str(page)))
+        query = [(key, value) for key, value in query if key not in {"p", "page"}]
+        query.append(("page", str(page)))
         return urlunsplit(
             (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
         )
