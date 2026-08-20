@@ -7,7 +7,7 @@ from loguru import logger
 
 from parser.cookies.base import CookiesProvider
 
-API_URL = "https://spfa.ru/api"
+API_URL = "https://spfa.pro/api"
 
 
 class ExternalApiCookiesProvider(CookiesProvider):

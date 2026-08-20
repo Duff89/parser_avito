@@ -7,7 +7,7 @@ import requests
 from loguru import logger
 
 
-SPFA_AVITO_URL_ENDPOINT = "https://spfa.ru/api/avito-url/"
+SPFA_AVITO_URL_ENDPOINT = "https://spfa.pro/api/avito-url/"
 
 
 class AvitoUrlConverter:

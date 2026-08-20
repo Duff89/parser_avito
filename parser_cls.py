@@ -24,6 +24,7 @@ from parser.proxies.proxy_factory import build_proxy
 from parser.url_converter import AvitoUrlConverter
 from utils.parse_phone import ParsePhone
 from version import VERSION
+from lang import SPFA_PROXY_REQUIRED
 
 DEBUG_MODE = False
 
@@ -340,6 +341,16 @@ if __name__ == "__main__":
     except Exception as err:
         logger.error(f"Ошибка загрузки конфига: {err}")
         exit(1)
+
+    if config.use_bypass_api and not (config.proxy_string or "").strip():
+        logger.critical(f"SPFA не будет работать без прокси. {SPFA_PROXY_REQUIRED}")
+        exit(1)
+
+    if config.use_bypass_api and not config.proxy_change_url:
+        logger.warning(
+            "SPFA запущен с серверным (статическим) прокси. Если будет много ошибок - установить большие "
+            "pause_between_links и pause_general, чтобы снизить риск блокировок."
+        )
 
     while True:
         try:

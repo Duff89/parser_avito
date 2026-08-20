@@ -1,2 +1,58 @@
-# created by virtualenv automatically
+# Secrets and local configuration
 .secret.txt
+config.toml
+config_backup.toml
+config.local.toml
+.env
+.env.*
+!.env.example
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+lib/
+pyvenv.cfg
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Runtime data containing cookies or other private data
+storage/
+cookies.json
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs and generated results
+logs/
+utils/logs/
+result/
+*.log
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+~$*

@@ -198,7 +198,7 @@ def main(page: ft.Page):
             ft.TextButton("Купить прокси",
                           on_click=lambda e: page.launch_url(
                               PROXY_LINK)),
-            ft.TextButton("Зарегистрироваться на spfa.ru",
+            ft.TextButton("Зарегистрироваться на spfa.pro",
                           on_click=lambda e: page.launch_url(
                               SPFA_LINK)),
             ft.TextButton("Отмена", on_click=close_dlg),
@@ -292,6 +292,21 @@ def main(page: ft.Page):
         return True
 
     def check_string():
+        if use_bypass_api.value and not (proxy.value or "").strip():
+            dlg_modal = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Для spfa.pro требуется прокси"),
+                content=ft.Text(SPFA_PROXY_REQUIRED),
+                actions=[
+                    ft.TextButton("Купить прокси",
+                                  on_click=lambda e: page.launch_url(
+                                      PROXY_LINK)),
+                    ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            page.open(dlg_modal)
+            return False
         if proxy.value and ("proxy.site" not in proxy.value or "@" not in proxy.value):
             dlg_modal = ft.AlertDialog(
                 modal=True,
@@ -427,7 +442,7 @@ def main(page: ft.Page):
                          can_reveal_password=True,
                          )
     proxy_change_ip = ft.TextField(
-        label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.space/?proxy_key=*** (только для мобильных прокси)", width=400,
+        label="Ссылка для изменения IP, в формате https://changeip.mobileproxy.rent/?proxy_key=*** (только для мобильных прокси)", width=400,
         expand=True, tooltip=PROXY_CHANGE_IP_HELP)
     proxy_btn_panel_help = ft.FilledButton(text="Помощь (если ничего непонятно)", on_click=open_dlg_modal, expand=True,
                                        tooltip=PROXY_BTN_HELP_HELP)
@@ -442,7 +457,7 @@ def main(page: ft.Page):
     )
 
     cookies_api_key = ft.TextField(
-        label="API ключ сервиса обхода блокировок spfa.ru (опционально)",
+        label="API ключ сервиса обхода блокировок spfa.pro (опционально)",
         password=True,
         can_reveal_password=True,
         expand=True,
@@ -453,13 +468,13 @@ def main(page: ft.Page):
         width=250,
         text_size=12,
         height=40,
-        tooltip="Минимальное время между покупками новых cookies через spfa.ru (чтобы не сжечь баланс)",
+        tooltip="Минимальное время между покупками новых cookies через spfa.pro (чтобы не сжечь баланс)",
     )
     use_bypass_api = ft.Checkbox("Использовать spfa сервис", value=False)
     bypass_api_key_help_icon = ft.IconButton(
         icon=ft.icons.HELP_OUTLINE,
         tooltip="api-key:\n\n"
-                "• Зарегистрируйтесь на spfa.ru, чтобы его получить\n"
+                "• Зарегистрируйтесь на spfa.pro, чтобы его получить\n"
                 "• Данный ключ поможет в обходе блокировок\n",
         icon_size=20,
     )
@@ -605,7 +620,7 @@ def main(page: ft.Page):
                                 content=ft.Column([
                                     ft.Row([
                                         ft.Icon(ft.icons.CLOUD, color=ft.colors.BLUE_400),
-                                        ft.Text("Сторонний сервис (spfa.ru)", size=14, weight=ft.FontWeight.W_500),
+                                        ft.Text("Сторонний сервис (spfa.pro)", size=14, weight=ft.FontWeight.W_500),
                                     ]),
                                     ft.Container(
                                         content=ft.Column([
