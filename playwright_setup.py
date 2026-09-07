@@ -4,6 +4,22 @@ import os
 from loguru import logger
 
 
+def get_browsers_dir() -> str:
+    """
+    Возвращает каталог, в котором Playwright хранит браузеры для текущей ОС.
+    """
+    custom_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if custom_dir:
+        return custom_dir
+
+    home = os.path.expanduser("~")
+    if sys.platform == "win32":
+        return os.path.join(home, "AppData", "Local", "ms-playwright")
+    if sys.platform == "darwin":
+        return os.path.join(home, "Library", "Caches", "ms-playwright")
+    return os.path.join(home, ".cache", "ms-playwright")
+
+
 def ensure_playwright_installed(browser: str = "chromium"):
     """
     Проверяет наличие браузеров Playwright и переопределяет путь для exe-сборки.
@@ -11,20 +27,15 @@ def ensure_playwright_installed(browser: str = "chromium"):
     """
     try:
         # === Указываем правильный путь к браузерам ===
-        ms_playwright_dir = os.path.join(
-            os.path.expanduser("~"), "AppData", "Local", "ms-playwright"
+        # Для exe-сборки под Windows путь нужно задать явно, на остальных ОС
+        # Playwright сам находит свой каталог с браузерами.
+        ms_playwright_dir = get_browsers_dir()
+        if sys.platform == "win32":
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = ms_playwright_dir
+
+        browsers_exist = os.path.isdir(ms_playwright_dir) and any(
+            name.startswith(browser) for name in os.listdir(ms_playwright_dir)
         )
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = ms_playwright_dir
-
-        from playwright._impl._driver import compute_driver_executable
-
-        result = compute_driver_executable()
-        if isinstance(result, tuple):
-            driver_path, _ = result
-        else:
-            driver_path = result
-
-        browsers_exist = os.path.exists(driver_path) or os.path.exists(ms_playwright_dir)
 
         if not browsers_exist:
             logger.info(f"Playwright не найден. Устанавливаю {browser}...")
