@@ -56,4 +56,6 @@ class AvitoConfig:
     retry_delay: int = 5
     timeout: int = 20
     block_threshold: int = 3
+    log_retention_days: int = 5
+    log_max_files: int = 10
 

@@ -36,3 +36,5 @@ tg_only_text = false
 retry_delay = 5
 timeout = 20
 block_threshold = 3
+log_retention_days = 5
+log_max_files = 10

@@ -23,12 +23,15 @@ from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
 from parser.url_converter import AvitoUrlConverter
 from utils.parse_phone import ParsePhone
+from utils.log_cleanup import clean_old_logs
 from version import VERSION
 from lang import SPFA_PROXY_REQUIRED
 
 DEBUG_MODE = False
 
-logger.add("logs/app.log", rotation="5 MB", retention="5 days", level="DEBUG")
+# Очистка устаревших логов перед добавлением хендлера (Issue #274)
+clean_old_logs("logs", max_age_days=5, max_files=10)
+logger.add("logs/app.log", rotation="5 MB", retention="5 days", compression="zip", level="DEBUG")
 
 
 class AvitoParse:
@@ -38,6 +41,10 @@ class AvitoParse:
             stop_event=None
     ):
         self.config = config
+        retention_days = getattr(self.config, "log_retention_days", 5)
+        max_files = getattr(self.config, "log_max_files", 10)
+        clean_old_logs("logs", max_age_days=retention_days, max_files=max_files)
+
         self.proxy = build_proxy(self.config)
         self.cookies_provider = build_cookies_provider(config=config, proxy=self.proxy)
         self.db_handler = SQLiteDBHandler()

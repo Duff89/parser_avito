@@ -13,6 +13,7 @@ from lang import *
 from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
 from utils import prompt_user_login
+from utils.log_cleanup import clean_old_logs
 from version import VERSION
 
 
@@ -132,6 +133,7 @@ def main(page: ft.Page):
         page.update()
 
     def logger_console_init():
+        clean_old_logs("logs", max_age_days=5, max_files=10)
         logger.add(logger_console_widget, format="{time:HH:mm:ss} - {message}")
 
     def logger_console_widget(message):
