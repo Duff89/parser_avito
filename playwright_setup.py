@@ -4,16 +4,19 @@ import os
 from loguru import logger
 
 
-def _get_browsers_path() -> str:
+def get_browsers_dir() -> str:
     """
-    Возвращает корректный путь к браузерам Playwright для текущей ОС.
+    Возвращает каталог, в котором Playwright хранит браузеры для текущей ОС.
     """
+    custom_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if custom_dir:
+        return custom_dir
+
     home = os.path.expanduser("~")
-    if os.name == "nt":  # Windows
+    if sys.platform == "win32":
         return os.path.join(home, "AppData", "Local", "ms-playwright")
-    if sys.platform == "darwin":  # macOS
+    if sys.platform == "darwin":
         return os.path.join(home, "Library", "Caches", "ms-playwright")
-    # Linux и прочие
     return os.path.join(home, ".cache", "ms-playwright")
 
 
@@ -39,9 +42,10 @@ def ensure_playwright_installed(browser: str = "chromium"):
     переопределяет путь для exe-сборки. Устанавливает их при необходимости.
     """
     try:
-        # === Указываем корректный путь к браузерам для текущей ОС ===
-        browsers_path = _get_browsers_path()
-        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = browsers_path
+        # Для exe-сборки под Windows путь нужно задать явно.
+        # Пользовательский PLAYWRIGHT_BROWSERS_PATH сохраняется.
+        if sys.platform == "win32":
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = get_browsers_dir()
 
         if _browser_installed(browser):
             logger.debug("Playwright уже установлен, хорошо")
@@ -55,4 +59,3 @@ def ensure_playwright_installed(browser: str = "chromium"):
 
     except Exception as e:
         logger.warning(f"Ошибка при установке\\проверке Playwright: {e}")
-
