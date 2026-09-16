@@ -246,22 +246,43 @@ def main(page: ft.Page):
         stop_btn.visible = True
         is_run = True
         page.update()
-        while is_run and not stop_event.is_set():
-            run_process()
-            if not is_run:
-                return
-            logger.info("Пауза между повторами")
-            for _ in range(int(pause_general.value if pause_general.value else 300)):
-                time.sleep(1)
-                if not is_run:
-                    logger.info("Завершено")
-                    start_btn.text = "Старт"
-                    start_btn.disabled = False
-                    page.update()
-                    return
-            if one_time_start.value:
-                stop_event.set()
-                page.window.close()
+
+        def _worker():
+            nonlocal is_run
+            while is_run and not stop_event.is_set():
+                try:
+                    config = load_avito_config("config.toml")
+                    parser = AvitoParse(config, stop_event=stop_event)
+                    parser.parse()
+                except Exception as err:
+                    logger.error(f"Ошибка в процессе парсинга: {err}")
+
+                if not is_run or stop_event.is_set():
+                    break
+
+                if one_time_start.value:
+                    stop_event.set()
+                    page.window.close()
+                    break
+
+                logger.info("Пауза между повторами")
+                for _ in range(int(pause_general.value if pause_general.value else 300)):
+                    if not is_run or stop_event.is_set():
+                        break
+                    time.sleep(1)
+
+            is_run = False
+            logger.info("Завершено")
+            try:
+                start_btn.text = "Старт"
+                start_btn.disabled = False
+                start_btn.visible = True
+                stop_btn.visible = False
+                page.update()
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def stop_parser(e):
         nonlocal is_run
@@ -344,17 +365,6 @@ def main(page: ft.Page):
             page.open(dlg_modal)
             return False
         return True
-
-    def run_process():
-        config = load_avito_config("config.toml")
-        parser = AvitoParse(config, stop_event=stop_event)
-        parsing_thread = threading.Thread(target=parser.parse)
-        parsing_thread.start()
-        parsing_thread.join()
-        start_btn.disabled = False
-        start_btn.text = "Старт"
-        page.update()
-
 
     def panel(title: str, content: list[ft.Control], expanded=False):
         panel_ref = ft.Ref[ft.ExpansionPanel]()

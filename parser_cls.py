@@ -221,7 +221,8 @@ class AvitoParse:
             self.notifier.notify(
                 message="Парсинг Авито завершён. Все ссылки обработаны"
             )
-            self.stop_event = True
+            if self.stop_event is not None and hasattr(self.stop_event, "set"):
+                self.stop_event.set()
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
         return [ad for ad in ads if ad.id]
@@ -260,10 +261,14 @@ class AvitoParse:
     @staticmethod
     def _add_promotion_to_ads(ads: list[Item]) -> list[Item]:
         for ad in ads:
+            steps = (ad.iva or {}).get("DateInfoStep") if isinstance(ad.iva, dict) else []
             ad.isPromotion = any(
-                v.get("title") == "Продвинуто"
-                for step in (ad.iva or {}).get("DateInfoStep", [])
-                for v in step.payload.get("vas", [])
+                isinstance(v, dict) and v.get("title") == "Продвинуто"
+                for step in (steps or [])
+                for v in (
+                    (getattr(step, "payload", None) or (step.get("payload") if isinstance(step, dict) else None) or {}).get("vas")
+                    or []
+                )
             )
         return ads
 
@@ -319,13 +324,22 @@ class AvitoParse:
 
     def is_viewed(self, ad: Item) -> bool:
         """Проверяет, смотрели мы это или нет"""
-        return self.db_handler.record_exists(record_id=ad.id, price=ad.priceDetailed.value)
+        price = (
+            ad.priceDetailed.value
+            if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+            else 0
+        )
+        return self.db_handler.record_exists(record_id=ad.id, price=price)
 
     @staticmethod
     def _is_recent(timestamp_ms: int, max_age_seconds: int) -> bool:
-        now = datetime.utcnow()
-        published_time = datetime.utcfromtimestamp(timestamp_ms / 1000)
-        return (now - published_time) <= timedelta(seconds=max_age_seconds)
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        try:
+            published_time = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+            return (now - published_time) <= timedelta(seconds=max_age_seconds)
+        except Exception:
+            return False
 
     def __save_viewed(self, ads: list[Item]) -> None:
         """Сохраняет просмотренные объявления"""

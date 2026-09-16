@@ -53,31 +53,43 @@ class ExcelStorage(ResultStorage):
 
     @staticmethod
     def _get_ad_time(ad: Item):
-        return (
-            datetime
-            .fromtimestamp(ad.sortTimeStamp / 1000, tz=get_localzone())
-            .replace(tzinfo=None)
-        )
+        if not ad.sortTimeStamp:
+            return ""
+        try:
+            return (
+                datetime
+                .fromtimestamp(ad.sortTimeStamp / 1000, tz=get_localzone())
+                .replace(tzinfo=None)
+            )
+        except Exception:
+            return ""
 
     @staticmethod
     def _get_item_coords(ad: Item) -> str:
-        if ad.coords and "lat" in ad.coords and "lng" in ad.coords:
-            return f"{ad.coords['lat']};{ad.coords['lng']}"
+        if ad.coords and isinstance(ad.coords, dict):
+            lat = ad.coords.get("lat")
+            lng = ad.coords.get("lng")
+            if lat is not None and lng is not None:
+                return f"{lat};{lng}"
         return ""
 
     @staticmethod
     def _get_item_address_user(ad: Item) -> str:
-        if ad.coords and "address_user" in ad.coords:
-            return ad.coords["address_user"]
+        if ad.coords and isinstance(ad.coords, dict) and "address_user" in ad.coords:
+            return str(ad.coords["address_user"] or "")
         return ""
 
     @staticmethod
     def _get_largest_image_url(img) -> str:
         try:
-            best_key = max(
-                img.root.keys(),
-                key=lambda k: int(k.split("x")[0]) * int(k.split("x")[1])
-            )
+            if not getattr(img, "root", None):
+                return ""
+            def _calc_dim(k: str) -> int:
+                parts = k.split("x")
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    return int(parts[0]) * int(parts[1])
+                return 0
+            best_key = max(img.root.keys(), key=_calc_dim)
             return str(img.root[best_key])
         except Exception as err:
             logger.error(f"При определении лучшего изображения ошибка: {err}")
@@ -101,13 +113,24 @@ class ExcelStorage(ResultStorage):
             for ad in ads:
                 images_urls = [
                     self._get_largest_image_url(img)
-                    for img in ad.images
+                    for img in (ad.images or [])
                 ]
+
+                price_value = (
+                    ad.priceDetailed.value
+                    if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+                    else 0
+                )
+
+                url_path = ad.urlPath or ""
+                if not url_path.startswith("/") and url_path:
+                    url_path = f"/{url_path}"
+                item_url = f"https://www.avito.ru{url_path}" if url_path else ""
 
                 row = [
                     self.excel_safe(ad.title),
-                    ad.priceDetailed.value,
-                    self.excel_safe(f"https://www.avito.ru/{ad.urlPath}"),
+                    price_value,
+                    self.excel_safe(item_url),
                     self.excel_safe(ad.description),
                     self._get_ad_time(ad),
                     self.excel_safe(ad.sellerId or ""),
@@ -116,8 +139,8 @@ class ExcelStorage(ResultStorage):
                     self.excel_safe(self._get_item_coords(ad)),
                     self.excel_safe(";".join(images_urls)),
                     "Да" if ad.isPromotion else "Нет",
-                    ad.total_views or "",
-                    ad.today_views or "",
+                    ad.total_views if ad.total_views is not None else "",
+                    ad.today_views if ad.today_views is not None else "",
                     self.excel_safe(ad.phone or ""),
                 ]
 

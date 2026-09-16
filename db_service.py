@@ -34,18 +34,30 @@ class SQLiteDBHandler:
 
     def add_record(self, ad: Item):
         """Добавляет новую запись в таблицу viewed."""
-
+        price = (
+            ad.priceDetailed.value
+            if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+            else 0
+        )
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO viewed (id, price) VALUES (?, ?)",
-                (ad.id, ad.priceDetailed.value),
+                (ad.id, price),
             )
             conn.commit()
 
     def add_record_from_page(self, ads: list[Item]):
         """Добавляет несколько записей в таблицу viewed."""
-        records = [(ad.id, ad.priceDetailed.value) for ad in ads]
+        records = [
+            (
+                ad.id,
+                ad.priceDetailed.value
+                if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+                else 0,
+            )
+            for ad in ads
+        ]
 
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()

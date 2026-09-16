@@ -38,12 +38,20 @@ class AdsFilter:
         return ads
 
     def _filter_by_price_range(self, ads: List[Item]) -> List[Item]:
-        if not self.config.min_price and not self.config.max_price:
+        min_p = self.config.min_price or 0
+        max_p = self.config.max_price if (self.config.max_price is not None and self.config.max_price > 0) else float("inf")
+        if min_p == 0 and max_p == float("inf"):
             return ads
-        try:
-            return [ad for ad in ads if self.config.min_price <= ad.priceDetailed.value <= self.config.max_price]
-        except Exception:
-            return ads
+        filtered = []
+        for ad in ads:
+            val = (
+                ad.priceDetailed.value
+                if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+                else 0
+            )
+            if min_p <= val <= max_p:
+                filtered.append(ad)
+        return filtered
 
     def _filter_by_black_keywords(self, ads: List[Item]) -> List[Item]:
         if not self.config.keys_word_black_list:
@@ -56,9 +64,13 @@ class AdsFilter:
         return [ad for ad in ads if self._is_phrase_in_ads(ad, self.config.keys_word_white_list)]
 
     def _filter_by_address(self, ads: List[Item]) -> List[Item]:
-        if not self.config.geo:
+        if not self.config.geo or not self.config.geo.strip():
             return ads
-        return [ad for ad in ads if self.config.geo in getattr(ad, "geo", {}).get("formattedAddress", "")]
+        geo_target = self.config.geo.strip().lower()
+        return [
+            ad for ad in ads
+            if ad.geo and getattr(ad.geo, "formattedAddress", None) and geo_target in ad.geo.formattedAddress.lower()
+        ]
 
     def _filter_by_seller(self, ads: List[Item]) -> List[Item]:
         if not self.config.seller_black_list:
@@ -68,13 +80,18 @@ class AdsFilter:
     def _filter_by_recent_time(self, ads: List[Item]) -> List[Item]:
         if not self.config.max_age:
             return ads
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
         filtered = []
         for ad in ads:
-            published = datetime.utcfromtimestamp(ad.sortTimeStamp / 1000)
-            if (now - published) <= timedelta(seconds=self.config.max_age):
-                filtered.append(ad)
+            if not ad.sortTimeStamp:
+                continue
+            try:
+                published = datetime.fromtimestamp(ad.sortTimeStamp / 1000, tz=timezone.utc)
+                if (now - published) <= timedelta(seconds=self.config.max_age):
+                    filtered.append(ad)
+            except Exception:
+                continue
         return filtered
 
     def _filter_by_reserve(self, ads: List[Item]) -> List[Item]:
@@ -86,10 +103,14 @@ class AdsFilter:
         if not self.config.ignore_promotion:
             return ads
         for ad in ads:
+            steps = (ad.iva or {}).get("DateInfoStep") if isinstance(ad.iva, dict) else []
             ad.isPromotion = any(
-                v.get("title") == "Продвинуто"
-                for step in (ad.iva or {}).get("DateInfoStep", [])
-                for v in step.payload.get("vas", [])
+                isinstance(v, dict) and v.get("title") == "Продвинуто"
+                for step in (steps or [])
+                for v in (
+                    (getattr(step, "payload", None) or (step.get("payload") if isinstance(step, dict) else None) or {}).get("vas")
+                    or []
+                )
             )
         return [ad for ad in ads if not ad.isPromotion]
 
