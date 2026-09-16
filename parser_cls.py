@@ -208,6 +208,8 @@ class AvitoParse:
                 filtered_ads = self.parse_phone(ads=filtered_ads)
 
                 if filtered_ads:
+                    logger.info(f"Сохраняю {len(filtered_ads)} объявлений")
+                    self.result_storage.save(filtered_ads)
                     self.__save_viewed(ads=filtered_ads)
                     ads_in_link.extend(filtered_ads)
 
@@ -215,8 +217,9 @@ class AvitoParse:
                 time.sleep(self.config.pause_between_links)
 
             if ads_in_link:
-                logger.info(f"Сохраняю {len(ads_in_link)} объявлений")
-                self.result_storage.save(ads_in_link)
+                logger.info(
+                    f"Всего сохранено по ссылке: {len(ads_in_link)} объявлений"
+                )
             else:
                 logger.info("Сохранять нечего")
 
