@@ -204,6 +204,7 @@ class AvitoParse:
                 filtered_ads = self.filter_ads(ads=ads)
                 self.notifier.notify_many(ads=filtered_ads)
                 filtered_ads = self.parse_views(ads=filtered_ads)
+                filtered_ads = self.parse_description(ads=filtered_ads)
                 filtered_ads = self.parse_phone(ads=filtered_ads)
 
                 if filtered_ads:
@@ -291,10 +292,38 @@ class AvitoParse:
                 if not html_code_full_page:
                     continue
                 ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
+                if full_desc := self._extract_description(html=html_code_full_page):
+                    ad.description = full_desc
                 delay = random.uniform(0.1, 0.9)
                 time.sleep(delay)
             except Exception as err:
                 logger.warning(f"Ошибка при парсинге {ad.urlPath}: {err}")
+                continue
+
+        return ads
+
+    def parse_description(self, ads: list[Item]) -> list[Item]:
+        """Парсинг полного описания товара со страницы объявления (Issue #305)."""
+        if not getattr(self.config, "parse_description", False):
+            return ads
+
+        logger.info("Начинаю парсинг полного описания")
+
+        for ad in ads:
+            # Пропускаем, если описание уже получено ранее (например, в parse_views)
+            if ad.description and len(ad.description) > 250 and not ad.description.rstrip().endswith("..."):
+                continue
+
+            try:
+                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
+                if not html_code_full_page:
+                    continue
+                if full_desc := self._extract_description(html=html_code_full_page):
+                    ad.description = full_desc
+                delay = random.uniform(0.1, 0.9)
+                time.sleep(delay)
+            except Exception as err:
+                logger.warning(f"Ошибка при парсинге описания {ad.urlPath}: {err}")
                 continue
 
         return ads
@@ -321,6 +350,39 @@ class AvitoParse:
         today = extract_digits(soup.select_one('[data-marker="item-view/today-views"]'))
 
         return total, today
+
+    @staticmethod
+    def _extract_description(html: str) -> str | None:
+        """Извлекает полный текст описания объявления со страницы Avito (Issue #305)."""
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 1. Поиск по data-marker (основной маркер Avito для описания)
+        desc_el = soup.select_one('[data-marker="item-description/text"]')
+        if desc_el:
+            text = desc_el.get_text(separator="\n", strip=True)
+            if text:
+                return text
+
+        # 2. Поиск по микроразметке Schema.org
+        desc_meta = soup.select_one('[itemprop="description"]')
+        if desc_meta:
+            text = desc_meta.get_text(separator="\n", strip=True)
+            if text:
+                return text
+
+        # 3. Поиск в JSON-состоянии страницы
+        try:
+            import html as html_lib
+            for script in soup.select('script[type="mime/invalid"][data-mfe-state="true"]'):
+                if 'sandbox' not in script.text:
+                    data = json.loads(html_lib.unescape(script.text))
+                    item_data = data.get('loaderData', {}).get("data", {}).get("item", {})
+                    if desc := item_data.get("description"):
+                        return desc.strip()
+        except Exception:
+            pass
+
+        return None
 
     @staticmethod
     def _extract_seller_slug(data):
