@@ -28,7 +28,8 @@ class ExcelStorage(ResultStorage):
         "Поднято",
         "Просмотры (всего)",
         "Просмотры (сегодня)",
-        "Телефон"
+        "Телефон",
+        "Параметры"
     ]
 
     def __init__(self, file_path: Path):
@@ -142,6 +143,11 @@ class ExcelStorage(ResultStorage):
                     ad.total_views if ad.total_views is not None else "",
                     ad.today_views if ad.today_views is not None else "",
                     self.excel_safe(ad.phone or ""),
+                    self.excel_safe(
+                        "; ".join(f"{k}: {v}" for k, v in ad.params.items())
+                        if isinstance(getattr(ad, "params", None), dict)
+                        else (ad.params or "")
+                    ),
                 ]
 
                 sheet.append(row)

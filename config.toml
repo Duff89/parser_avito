@@ -26,6 +26,7 @@ one_time_start = false
 one_file_for_link = false
 parse_views = false
 parse_description = false
+parse_params = false
 save_xlsx = true
 use_webdriver = false
 use_bypass_api = false

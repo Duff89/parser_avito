@@ -203,6 +203,7 @@ class AvitoParse:
                 self.notifier.notify_many(ads=filtered_ads)
                 filtered_ads = self.parse_views(ads=filtered_ads)
                 filtered_ads = self.parse_description(ads=filtered_ads)
+                filtered_ads = self.parse_params(ads=filtered_ads)
                 filtered_ads = self.parse_phone(ads=filtered_ads)
 
                 if filtered_ads:
@@ -333,7 +334,62 @@ class AvitoParse:
 
         return description or None, total, today
 
-    def _enrich_ads(self, ads: list[Item], *, views: bool, description: bool) -> list[Item]:
+    @staticmethod
+    def _extract_params(payload: dict) -> dict[str, str] | None:
+        """
+        Извлечение характеристик объявления («О помещении», параметры товара).
+        Поддерживает сценарии Beduin (mobile API scenario) и mobile.params.
+        """
+        if not isinstance(payload, dict):
+            return None
+
+        def nested_dict(value, *keys):
+            for key in keys:
+                if not isinstance(value, dict):
+                    return {}
+                value = value.get(key)
+            return value if isinstance(value, dict) else {}
+
+        params_dict: dict[str, str] = {}
+
+        # 1. Beduin scenario: success.view.scenario.beduin.main.params
+        card_params = nested_dict(
+            payload, "success", "view", "scenario", "beduin", "main", "params"
+        )
+        if isinstance(card_params, dict):
+            for widget_key, widget_data in card_params.items():
+                if isinstance(widget_data, dict):
+                    items = widget_data.get("items")
+                    if isinstance(items, list):
+                        for item in items:
+                            if isinstance(item, dict):
+                                title = item.get("title") or item.get("name") or item.get("label")
+                                desc = item.get("description") or item.get("value") or item.get("text")
+                                if isinstance(title, str) and title.strip():
+                                    if isinstance(desc, (str, int, float)) and str(desc).strip():
+                                        params_dict[title.strip()] = str(desc).strip()
+
+        # 2. Mobile API: success.mobile.params / parameters / properties
+        mobile = nested_dict(payload, "success", "mobile")
+        for container in (mobile.get("params"), mobile.get("parameters"), mobile.get("properties")):
+            if isinstance(container, list):
+                for item in container:
+                    if isinstance(item, dict):
+                        title = item.get("title") or item.get("name") or item.get("label")
+                        desc = item.get("description") or item.get("value") or item.get("text")
+                        if isinstance(title, str) and title.strip():
+                            if isinstance(desc, (str, int, float)) and str(desc).strip():
+                                params_dict[title.strip()] = str(desc).strip()
+            elif isinstance(container, dict):
+                for k, v in container.items():
+                    if isinstance(k, str) and k.strip() and isinstance(v, (str, int, float)) and str(v).strip():
+                        params_dict[k.strip()] = str(v).strip()
+
+        return params_dict if params_dict else None
+
+    def _enrich_ads(
+        self, ads: list[Item], *, views: bool, description: bool, params: bool = False
+    ) -> list[Item]:
         total_ads = len(ads)
         for index, ad in enumerate(ads, start=1):
             if self.stop_event and self.stop_event.is_set():
@@ -361,6 +417,10 @@ class AvitoParse:
                     )
                 if description and full_description:
                     ad.description = full_description
+                if params or getattr(self.config, "parse_params", False):
+                    item_params = self._extract_params(payload)
+                    if item_params:
+                        ad.params = item_params
             except Exception as err:
                 logger.warning(f"Ошибка при разборе карточки {ad.id}: {err}")
                 continue
@@ -373,7 +433,10 @@ class AvitoParse:
 
         logger.info("Начинаю парсинг просмотров")
         return self._enrich_ads(
-            ads, views=True, description=getattr(self.config, "parse_description", False)
+            ads,
+            views=True,
+            description=getattr(self.config, "parse_description", False),
+            params=getattr(self.config, "parse_params", False),
         )
 
     def parse_description(self, ads: list[Item]) -> list[Item]:
@@ -381,7 +444,21 @@ class AvitoParse:
             return ads
 
         logger.info("Начинаю парсинг полного описания")
-        return self._enrich_ads(ads, views=False, description=True)
+        return self._enrich_ads(
+            ads,
+            views=False,
+            description=True,
+            params=getattr(self.config, "parse_params", False),
+        )
+
+    def parse_params(self, ads: list[Item]) -> list[Item]:
+        if not getattr(self.config, "parse_params", False):
+            return ads
+        if self.config.parse_views or getattr(self.config, "parse_description", False):
+            return ads
+
+        logger.info("Начинаю парсинг характеристик объявлений")
+        return self._enrich_ads(ads, views=False, description=False, params=True)
 
     def parse_phone(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_phone or self.config.parse_phone:
