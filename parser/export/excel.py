@@ -127,13 +127,17 @@ class ExcelStorage(ResultStorage):
                     url_path = f"/{url_path}"
                 item_url = f"https://www.avito.ru{url_path}" if url_path else ""
 
+                seller_val = getattr(ad, "sellerName", None) or getattr(ad, "sellerId", "")
+                if getattr(ad, "sellerName", None) and getattr(ad, "sellerId", None) and ad.sellerName != ad.sellerId:
+                    seller_val = f"{ad.sellerName} ({ad.sellerId})"
+
                 row = [
                     self.excel_safe(ad.title),
                     price_value,
                     self.excel_safe(item_url),
                     self.excel_safe(ad.description),
                     self._get_ad_time(ad),
-                    self.excel_safe(ad.sellerId or ""),
+                    self.excel_safe(seller_val),
                     self.excel_safe(ad.location.name if ad.location else ""),
                     self.excel_safe(self._get_item_address_user(ad)),
                     self.excel_safe(self._get_item_coords(ad)),

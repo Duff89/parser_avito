@@ -1,4 +1,7 @@
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from dataclasses import fields
 from pathlib import Path
 
