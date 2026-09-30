@@ -441,18 +441,56 @@ class AvitoParse:
 
     @staticmethod
     def _extract_seller_slug(data):
-        match = re.search(r"/brands/([^/?#]+)", str(data))
+        """Извлекает идентификатор/slug продавца из объекта объявления (бренды или профиль пользователя)."""
+        user_logo = getattr(data, "userLogo", None)
+        if user_logo and getattr(user_logo, "link", None):
+            match = re.search(r"/(?:brands|user)/([^/?#'\"\s]+)", str(user_logo.link))
+            if match:
+                return match.group(1).rstrip("/")
+
+        match = re.search(r"/(?:brands|user)/([a-zA-Z0-9_\-]+)", str(data))
         if match:
             return match.group(1)
+
+        return None
+
+    @staticmethod
+    def _extract_seller_name(html: str) -> str | None:
+        """Извлекает имя продавца со страницы объявления (Issue #333)."""
+        soup = BeautifulSoup(html, "html.parser")
+        for marker in ['[data-marker="seller-info/name"]', '[data-marker="seller-link/link"]', '[data-marker="seller-info/label"]']:
+            el = soup.select_one(marker)
+            if el and el.get_text(strip=True):
+                return el.get_text(strip=True)
+
+        try:
+            import html as html_lib
+            for script in soup.select('script[type="mime/invalid"][data-mfe-state="true"]'):
+                if 'sandbox' not in script.text:
+                    data = json.loads(html_lib.unescape(script.text))
+                    item_data = data.get('loaderData', {}).get("data", {}).get("item", {})
+                    seller = item_data.get("seller", {})
+                    if name := seller.get("name"):
+                        return name.strip()
+        except Exception:
+            pass
+
         return None
 
     def is_viewed(self, ad: Item) -> bool:
-        """Проверяет, смотрели мы это или нет"""
+        """Проверяет, смотрели мы это или нет. Если цена изменилась, фиксирует старую цену (Issue #214)."""
         price = (
             ad.priceDetailed.value
             if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
             else 0
         )
+        if hasattr(self.db_handler, "get_record_price"):
+            saved_price = self.db_handler.get_record_price(ad.id)
+            if isinstance(saved_price, int):
+                if saved_price != price:
+                    ad.old_price = saved_price
+                    return False
+                return True
         return self.db_handler.record_exists(record_id=ad.id, price=price)
 
     @staticmethod

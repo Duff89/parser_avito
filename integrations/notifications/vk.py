@@ -153,10 +153,21 @@ class VKNotifier(Notifier):
                                                                                                        "")))
         title = clean(getattr(ad, "title", ""))
         short_url = f"https://avito.ru/{getattr(ad, 'id', '')}"
-        seller = clean(str(getattr(ad, "sellerId", ""))) if getattr(ad, "sellerId", None) else ""
+        seller_display = getattr(ad, "sellerName", None) or getattr(ad, "sellerId", "")
+        seller = clean(str(seller_display)) if seller_display else ""
 
         parts = []
-        if price:
+        if getattr(ad, "old_price", None) is not None and getattr(ad, "priceDetailed", None) and getattr(ad.priceDetailed, "value", None) is not None:
+            new_val = ad.priceDetailed.value
+            old_val = ad.old_price
+            old_formatted = f"{old_val:,}".replace(",", " ") + " ₽"
+            new_formatted = f"{new_val:,}".replace(",", " ") + " ₽"
+            arrow = "📉" if new_val < old_val else "📈"
+            price_part = f"{arrow} {old_formatted} ➔ {new_formatted}"
+            if getattr(ad, "isPromotion", False):
+                price_part += " 🔥"
+            parts.append(price_part)
+        elif price:
             price_part = f"💰 {price}"
             if getattr(ad, "isPromotion", False):
                 price_part += " 🔥"

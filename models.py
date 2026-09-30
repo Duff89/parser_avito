@@ -24,17 +24,17 @@ class AddressDetailed(BaseModel):
 
 
 class PriceDetailed(BaseModel):
-    enabled: bool
-    fullString: str
-    hasValue: bool
-    postfix: str
-    string: str
-    stringWithoutDiscount: Optional[str]
-    title: Dict[str, str]
-    titleDative: str
-    value: int
-    wasLowered: bool
-    exponent: str
+    enabled: bool = True
+    fullString: str = ""
+    hasValue: bool = True
+    postfix: str = "₽"
+    string: str = ""
+    stringWithoutDiscount: Optional[str] = None
+    title: Dict[str, str] = {}
+    titleDative: str = ""
+    value: int = 0
+    wasLowered: bool = False
+    exponent: str = ""
 
 
 class Image(RootModel):
@@ -83,7 +83,7 @@ class Gallery(BaseModel):
 class UserLogo(BaseModel):
     link: str | None = None
     src: HttpUrl | str | None = None
-    developerId: Optional[int]
+    developerId: Optional[int] = None
 
 
 class IvaComponent(BaseModel):
@@ -144,6 +144,8 @@ class Item(BaseModel):
     closestAddressId: int | None = None
     isSparePartsCompatibility: bool | None = None
     sellerId: str | None = None
+    sellerName: str | None = None
+    old_price: int | None = None
     isPromotion: bool = False
     total_views: int | None = None
     today_views: int | None = None

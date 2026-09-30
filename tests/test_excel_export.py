@@ -124,3 +124,23 @@ def test_excel_coords_handling():
         assert row1[8] == "55.75;37.61"
         assert row2[8] in ("", None)
         assert row3[8] in ("", None)
+
+
+def test_excel_seller_name_and_id():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        file_path = Path(tmp_dir) / "seller_export.xlsx"
+        excel = Excel(file_path=file_path)
+
+        ad_both = Item(id=1, sellerName="Мебель Люкс", sellerId="mebel_shop")
+        ad_name_only = Item(id=2, sellerName="Алексей Частник", sellerId=None)
+        ad_id_only = Item(id=3, sellerName=None, sellerId="shop123")
+
+        excel.save([ad_both, ad_name_only, ad_id_only])
+
+        wb = load_workbook(file_path)
+        sheet = wb.active
+        # Col index 5 is seller (0-indexed: Заголовок, Цена, URL, Описание, Дата, Продавец)
+        assert sheet.cell(row=2, column=6).value == "Мебель Люкс (mebel_shop)"
+        assert sheet.cell(row=3, column=6).value == "Алексей Частник"
+        assert sheet.cell(row=4, column=6).value == "shop123"
+
