@@ -23,12 +23,13 @@ from parser.http.client import HttpClient
 from parser.proxies.proxy_factory import build_proxy
 from parser.url_converter import AvitoUrlConverter
 from utils.parse_phone import ParsePhone
+from utils.log_cleanup import clean_old_logs
 from version import VERSION
 from lang import SPFA_PROXY_REQUIRED
 
-DEBUG_MODE = False
-
-logger.add("logs/app.log", rotation="5 MB", retention="5 days", level="DEBUG")
+# Очистка устаревших логов перед добавлением хендлера (Issue #274)
+clean_old_logs("logs", max_age_days=5, max_files=10)
+logger.add("logs/app.log", rotation="5 MB", retention="5 days", compression="zip", level="DEBUG")
 
 
 class AvitoParse:
@@ -38,6 +39,10 @@ class AvitoParse:
             stop_event=None
     ):
         self.config = config
+        retention_days = getattr(self.config, "log_retention_days", 5)
+        max_files = getattr(self.config, "log_max_files", 10)
+        clean_old_logs("logs", max_age_days=retention_days, max_files=max_files)
+
         self.proxy = build_proxy(self.config)
         self.cookies_provider = build_cookies_provider(config=config, proxy=self.proxy)
         self.db_handler = SQLiteDBHandler()
@@ -197,9 +202,12 @@ class AvitoParse:
                 filtered_ads = self.filter_ads(ads=ads)
                 self.notifier.notify_many(ads=filtered_ads)
                 filtered_ads = self.parse_views(ads=filtered_ads)
+                filtered_ads = self.parse_description(ads=filtered_ads)
                 filtered_ads = self.parse_phone(ads=filtered_ads)
 
                 if filtered_ads:
+                    logger.info(f"Сохраняю {len(filtered_ads)} объявлений")
+                    self.result_storage.save(filtered_ads)
                     self.__save_viewed(ads=filtered_ads)
                     ads_in_link.extend(filtered_ads)
 
@@ -207,8 +215,9 @@ class AvitoParse:
                 time.sleep(self.config.pause_between_links)
 
             if ads_in_link:
-                logger.info(f"Сохраняю {len(ads_in_link)} объявлений")
-                self.result_storage.save(ads_in_link)
+                logger.info(
+                    f"Всего сохранено по ссылке: {len(ads_in_link)} объявлений"
+                )
             else:
                 logger.info("Сохранять нечего")
 
@@ -221,7 +230,8 @@ class AvitoParse:
             self.notifier.notify(
                 message="Парсинг Авито завершён. Все ссылки обработаны"
             )
-            self.stop_event = True
+            if self.stop_event is not None and hasattr(self.stop_event, "set"):
+                self.stop_event.set()
     @staticmethod
     def _clean_null_ads(ads: list[Item]) -> list[Item]:
         return [ad for ad in ads if ad.id]
@@ -260,11 +270,101 @@ class AvitoParse:
     @staticmethod
     def _add_promotion_to_ads(ads: list[Item]) -> list[Item]:
         for ad in ads:
+            steps = (ad.iva or {}).get("DateInfoStep") if isinstance(ad.iva, dict) else []
             ad.isPromotion = any(
-                v.get("title") == "Продвинуто"
-                for step in (ad.iva or {}).get("DateInfoStep", [])
-                for v in step.payload.get("vas", [])
+                isinstance(v, dict) and v.get("title") == "Продвинуто"
+                for step in (steps or [])
+                for v in (
+                    (getattr(step, "payload", None) or (step.get("payload") if isinstance(step, dict) else None) or {}).get("vas")
+                    or []
+                )
             )
+        return ads
+
+    @staticmethod
+    def _extract_item_details(payload: dict) -> tuple[str | None, int | None, int | None]:
+        def nested_dict(value, *keys):
+            for key in keys:
+                if not isinstance(value, dict):
+                    return {}
+                value = value.get(key)
+            return value if isinstance(value, dict) else {}
+
+        mobile = nested_dict(payload, "success", "mobile")
+        mobile_views = nested_dict(mobile, "stats", "views")
+        card_params = nested_dict(
+            payload, "success", "view", "scenario", "beduin", "main", "params"
+        )
+        card_views = nested_dict(card_params, "metaDataAndStats", "views")
+
+        def count(value):
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str):
+                digits = "".join(char for char in value if char.isdigit())
+                return int(digits) if digits else None
+            return None
+
+        total = count(mobile_views.get("total"))
+        today = count(mobile_views.get("today"))
+        if total is None:
+            total = count(card_views.get("total"))
+        if today is None:
+            today = count(
+                card_views.get("today")
+                or card_views.get("todayViews")
+                or card_views.get("today_views")
+            )
+
+        description = mobile.get("description")
+        description = description.strip() if isinstance(description, str) else None
+        if not description:
+            segments = nested_dict(card_params, "description").get("segments")
+            if isinstance(segments, list):
+                description = "".join(
+                    segment["text"]
+                    for segment in segments
+                    if isinstance(segment, dict)
+                    and isinstance(segment.get("text"), str)
+                )
+                description = description.replace("\u2028", "\n").strip() or None
+
+        return description or None, total, today
+
+    def _enrich_ads(self, ads: list[Item], *, views: bool, description: bool) -> list[Item]:
+        total_ads = len(ads)
+        for index, ad in enumerate(ads, start=1):
+            if self.stop_event and self.stop_event.is_set():
+                break
+            if not isinstance(ad.id, int) or isinstance(ad.id, bool):
+                logger.warning(f"Пропускаю объявление без числового ID: {ad.id}")
+                continue
+
+            try:
+                payload = self.http.fetch_item_data(ad.id)
+                self.good_request_count += 1
+            except Exception as err:
+                self.bad_request_count += 1
+                logger.warning(f"Ошибка при запросе карточки {ad.id}: {err}")
+                continue
+            try:
+                full_description, total_views, today_views = self._extract_item_details(payload)
+                if views:
+                    ad.total_views = total_views
+                    ad.today_views = today_views
+                    logger.info(
+                        f"id {ad.id} ({index}/{total_ads}) - "
+                        f"{total_views if total_views is not None else 'нет данных'} просмотров всего, "
+                        f"{today_views if today_views is not None else 'нет данных'} сегодня"
+                    )
+                if description and full_description:
+                    ad.description = full_description
+            except Exception as err:
+                logger.warning(f"Ошибка при разборе карточки {ad.id}: {err}")
+                continue
+            time.sleep(random.uniform(0.1, 0.9))
         return ads
 
     def parse_views(self, ads: list[Item]) -> list[Item]:
@@ -272,20 +372,16 @@ class AvitoParse:
             return ads
 
         logger.info("Начинаю парсинг просмотров")
+        return self._enrich_ads(
+            ads, views=True, description=getattr(self.config, "parse_description", False)
+        )
 
-        for ad in ads:
-            try:
-                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
-                if not html_code_full_page:
-                    continue
-                ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
-                delay = random.uniform(0.1, 0.9)
-                time.sleep(delay)
-            except Exception as err:
-                logger.warning(f"Ошибка при парсинге {ad.urlPath}: {err}")
-                continue
+    def parse_description(self, ads: list[Item]) -> list[Item]:
+        if not getattr(self.config, "parse_description", False) or self.config.parse_views:
+            return ads
 
-        return ads
+        logger.info("Начинаю парсинг полного описания")
+        return self._enrich_ads(ads, views=False, description=True)
 
     def parse_phone(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_phone or self.config.parse_phone:
@@ -311,6 +407,39 @@ class AvitoParse:
         return total, today
 
     @staticmethod
+    def _extract_description(html: str) -> str | None:
+        """Извлекает полный текст описания объявления со страницы Avito (Issue #305)."""
+        soup = BeautifulSoup(html, "html.parser")
+
+        # 1. Поиск по data-marker (основной маркер Avito для описания)
+        desc_el = soup.select_one('[data-marker="item-description/text"]')
+        if desc_el:
+            text = desc_el.get_text(separator="\n", strip=True)
+            if text:
+                return text
+
+        # 2. Поиск по микроразметке Schema.org
+        desc_meta = soup.select_one('[itemprop="description"]')
+        if desc_meta:
+            text = desc_meta.get_text(separator="\n", strip=True)
+            if text:
+                return text
+
+        # 3. Поиск в JSON-состоянии страницы
+        try:
+            import html as html_lib
+            for script in soup.select('script[type="mime/invalid"][data-mfe-state="true"]'):
+                if 'sandbox' not in script.text:
+                    data = json.loads(html_lib.unescape(script.text))
+                    item_data = data.get('loaderData', {}).get("data", {}).get("item", {})
+                    if desc := item_data.get("description"):
+                        return desc.strip()
+        except Exception:
+            pass
+
+        return None
+
+    @staticmethod
     def _extract_seller_slug(data):
         match = re.search(r"/brands/([^/?#]+)", str(data))
         if match:
@@ -319,13 +448,22 @@ class AvitoParse:
 
     def is_viewed(self, ad: Item) -> bool:
         """Проверяет, смотрели мы это или нет"""
-        return self.db_handler.record_exists(record_id=ad.id, price=ad.priceDetailed.value)
+        price = (
+            ad.priceDetailed.value
+            if (ad.priceDetailed and getattr(ad.priceDetailed, "value", None) is not None)
+            else 0
+        )
+        return self.db_handler.record_exists(record_id=ad.id, price=price)
 
     @staticmethod
     def _is_recent(timestamp_ms: int, max_age_seconds: int) -> bool:
-        now = datetime.utcnow()
-        published_time = datetime.utcfromtimestamp(timestamp_ms / 1000)
-        return (now - published_time) <= timedelta(seconds=max_age_seconds)
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        try:
+            published_time = datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+            return (now - published_time) <= timedelta(seconds=max_age_seconds)
+        except Exception:
+            return False
 
     def __save_viewed(self, ads: list[Item]) -> None:
         """Сохраняет просмотренные объявления"""

@@ -13,6 +13,7 @@ from lang import *
 from load_config import save_avito_config, load_avito_config
 from parser_cls import AvitoParse
 from utils import prompt_user_login
+from utils.log_cleanup import clean_old_logs
 from version import VERSION
 
 
@@ -63,6 +64,7 @@ def main(page: ft.Page):
         one_time_start.value = config.one_time_start
         one_file_for_link.value = config.one_file_for_link
         parse_views.value = config.parse_views
+        parse_description.value = getattr(config, "parse_description", False)
         save_xlsx.value = config.save_xlsx
         use_webdriver.value = config.use_webdriver
         use_bypass_api.value = config.use_bypass_api
@@ -110,6 +112,7 @@ def main(page: ft.Page):
             "one_time_start": one_time_start.value,
             "one_file_for_link": one_file_for_link.value,
             "parse_views": parse_views.value,
+            "parse_description": parse_description.value,
             "save_xlsx": save_xlsx.value,
             "use_webdriver": use_webdriver.value,
             "use_bypass_api": use_bypass_api.value,
@@ -132,6 +135,7 @@ def main(page: ft.Page):
         page.update()
 
     def logger_console_init():
+        clean_old_logs("logs", max_age_days=5, max_files=10)
         logger.add(logger_console_widget, format="{time:HH:mm:ss} - {message}")
 
     def logger_console_widget(message):
@@ -205,7 +209,6 @@ def main(page: ft.Page):
 
         ],
         actions_alignment=ft.MainAxisAlignment.END,
-        on_dismiss=lambda e: print("Modal dialog dismissed!"),
     )
 
 
@@ -246,22 +249,43 @@ def main(page: ft.Page):
         stop_btn.visible = True
         is_run = True
         page.update()
-        while is_run and not stop_event.is_set():
-            run_process()
-            if not is_run:
-                return
-            logger.info("Пауза между повторами")
-            for _ in range(int(pause_general.value if pause_general.value else 300)):
-                time.sleep(1)
-                if not is_run:
-                    logger.info("Завершено")
-                    start_btn.text = "Старт"
-                    start_btn.disabled = False
-                    page.update()
-                    return
-            if one_time_start.value:
-                stop_event.set()
-                page.window.close()
+
+        def _worker():
+            nonlocal is_run
+            while is_run and not stop_event.is_set():
+                try:
+                    config = load_avito_config("config.toml")
+                    parser = AvitoParse(config, stop_event=stop_event)
+                    parser.parse()
+                except Exception as err:
+                    logger.error(f"Ошибка в процессе парсинга: {err}")
+
+                if not is_run or stop_event.is_set():
+                    break
+
+                if one_time_start.value:
+                    stop_event.set()
+                    page.window.close()
+                    break
+
+                logger.info("Пауза между повторами")
+                for _ in range(int(pause_general.value if pause_general.value else 300)):
+                    if not is_run or stop_event.is_set():
+                        break
+                    time.sleep(1)
+
+            is_run = False
+            logger.info("Завершено")
+            try:
+                start_btn.text = "Старт"
+                start_btn.disabled = False
+                start_btn.visible = True
+                stop_btn.visible = False
+                page.update()
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def stop_parser(e):
         nonlocal is_run
@@ -285,7 +309,6 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
@@ -319,7 +342,6 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
@@ -339,22 +361,10 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
         return True
-
-    def run_process():
-        config = load_avito_config("config.toml")
-        parser = AvitoParse(config, stop_event=stop_event)
-        parsing_thread = threading.Thread(target=parser.parse)
-        parsing_thread.start()
-        parsing_thread.join()
-        start_btn.disabled = False
-        start_btn.text = "Старт"
-        page.update()
-
 
     def panel(title: str, content: list[ft.Control], expanded=False):
         panel_ref = ft.Ref[ft.ExpansionPanel]()
@@ -548,6 +558,8 @@ def main(page: ft.Page):
                                     tooltip=ONE_FILE_FOR_LINK_HELP)
     parse_views = ft.Checkbox(label="Парсить просмотры", value=False,
                                     tooltip=PARSE_VIEWS_HELP)
+    parse_description = ft.Checkbox(label="Парсить описание полностью", value=False,
+                                    tooltip="Загружает полное описание из карточки вместо краткого анонса")
     parse_phone = ft.Checkbox(label="Парсить телефоны", value=False, on_change=check_api_key_exist,
                               tooltip=PARSE_PHONE_HELP)
 
@@ -699,6 +711,7 @@ def main(page: ft.Page):
                     ft.Row([max_count_of_retry, retry_delay, timeout]),
                     ft.Row([one_time_start, one_file_for_link]),
                     ft.Row([parse_views,
+                            parse_description,
                             #parse_phone,
                             save_xlsx]),
                 ]

@@ -12,6 +12,7 @@ API_URL = "https://spfa.pro/api"
 
 class ExternalApiCookiesProvider(CookiesProvider):
     MAX_STATUS_HISTORY = 20
+    SPFA_REQUEST_TIMEOUT = 120
 
     def __init__(
         self,
@@ -158,7 +159,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
                     "proxy": self.proxy
                 },
                 headers=self.headers,
-                timeout=30,
+                timeout=self.SPFA_REQUEST_TIMEOUT,
             )
         except requests.RequestException as e:
             logger.error(
@@ -220,7 +221,7 @@ class ExternalApiCookiesProvider(CookiesProvider):
                     "proxy": self.proxy
                 },
                 headers=self.headers,
-                timeout=30,
+                timeout=self.SPFA_REQUEST_TIMEOUT,
             )
         except requests.RequestException as e:
             logger.error(f"❌ Не удалось связаться с сервисом cookies | ошибка={e}")
