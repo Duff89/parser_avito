@@ -209,7 +209,6 @@ def main(page: ft.Page):
 
         ],
         actions_alignment=ft.MainAxisAlignment.END,
-        on_dismiss=lambda e: print("Modal dialog dismissed!"),
     )
 
 
@@ -310,7 +309,6 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
@@ -344,7 +342,6 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
@@ -364,7 +361,6 @@ def main(page: ft.Page):
                     ft.TextButton("Понятно", on_click=lambda e: page.close(dlg_modal)),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
-                on_dismiss=lambda e: print("Окно закрыто"),
             )
             page.open(dlg_modal)
             return False
@@ -563,7 +559,7 @@ def main(page: ft.Page):
     parse_views = ft.Checkbox(label="Парсить просмотры", value=False,
                                     tooltip=PARSE_VIEWS_HELP)
     parse_description = ft.Checkbox(label="Парсить описание полностью", value=False,
-                                    tooltip="Загружает полное описание со страницы товара вместо краткого анонса")
+                                    tooltip="Загружает полное описание из карточки вместо краткого анонса")
     parse_phone = ft.Checkbox(label="Парсить телефоны", value=False, on_change=check_api_key_exist,
                               tooltip=PARSE_PHONE_HELP)
 

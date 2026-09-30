@@ -10,6 +10,24 @@ from parser.proxies.proxy import Proxy
 
 
 class HttpClient:
+    ITEM_API_URL = "https://m.avito.ru/api/1/card/items/{item_id}"
+    ITEM_API_HEADERS = {
+        "accept": "application/json, text/plain, */*",
+        "accept-language": "ru-RU,ru;q=0.9",
+        "referer": "https://m.avito.ru/",
+        "sec-ch-ua": '"Chromium";v="131", "Not_A Brand";v="24"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": (
+            "Mozilla/5.0 (Linux; Android 14; Pixel 8) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Mobile Safari/537.36"
+        ),
+    }
+
     def __init__(
         self,
         proxy: Proxy,
@@ -77,6 +95,14 @@ class HttpClient:
         self._client.close()
         self._client = self._build_client()
 
+    def _recover_session(self) -> None:
+        """Сменить IP и обновить cookies в правильном порядке."""
+        self.proxy.handle_block()
+        if self.cookies:
+            self.cookies.handle_block()
+        self._reset_client()
+        self._block_attempts = 0
+
     def request(self, method: str, url: str, **kwargs):
         last_exc = None
 
@@ -92,7 +118,6 @@ class HttpClient:
                 if self.cookies:
                     self.cookies.update(response)
 
-                print(response.url)
                 if response.status_code in (403, 429, 439):
                     self._block_attempts += 1
                     logger.warning(
@@ -102,11 +127,7 @@ class HttpClient:
 
                     if self._block_attempts >= self.block_threshold:
                         logger.warning("Достигнут лимит блокировок, запускается обработка")
-                        if self.cookies:
-                            self.cookies.handle_block()
-                        self.proxy.handle_block()
-                        self._reset_client()
-                        self._block_attempts = 0
+                        self._recover_session()
 
                     time.sleep(self.retry_delay)
                     continue
@@ -117,8 +138,27 @@ class HttpClient:
 
             except requests.RequestsError as e:
                 last_exc = e
-                self._block_attempts = 0
+                self._block_attempts += 1
                 logger.warning(f"Request error (attempt {attempt}): {e}")
+                if self._block_attempts >= self.block_threshold:
+                    logger.warning(
+                        "Достигнут лимит сетевых ошибок, "
+                        "обновляем proxy и cookies"
+                    )
+                    self._recover_session()
                 time.sleep(self.retry_delay)
 
         raise RuntimeError("HTTP запросы были неуспешными") from last_exc
+
+    def fetch_item_data(self, item_id: int) -> dict:
+        """Загрузить JSON карточки объявления через mobile API."""
+        response = self.request(
+            "GET",
+            self.ITEM_API_URL.format(item_id=item_id),
+            headers=self.ITEM_API_HEADERS.copy(),
+        )
+        logger.info(f"Карточка {item_id}: HTTP {response.status_code}")
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Ответ карточки не является JSON-объектом")
+        return payload

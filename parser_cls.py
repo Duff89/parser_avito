@@ -27,8 +27,6 @@ from utils.log_cleanup import clean_old_logs
 from version import VERSION
 from lang import SPFA_PROXY_REQUIRED
 
-DEBUG_MODE = False
-
 # Очистка устаревших логов перед добавлением хендлера (Issue #274)
 clean_old_logs("logs", max_age_days=5, max_files=10)
 logger.add("logs/app.log", rotation="5 MB", retention="5 days", compression="zip", level="DEBUG")
@@ -283,53 +281,107 @@ class AvitoParse:
             )
         return ads
 
+    @staticmethod
+    def _extract_item_details(payload: dict) -> tuple[str | None, int | None, int | None]:
+        def nested_dict(value, *keys):
+            for key in keys:
+                if not isinstance(value, dict):
+                    return {}
+                value = value.get(key)
+            return value if isinstance(value, dict) else {}
+
+        mobile = nested_dict(payload, "success", "mobile")
+        mobile_views = nested_dict(mobile, "stats", "views")
+        card_params = nested_dict(
+            payload, "success", "view", "scenario", "beduin", "main", "params"
+        )
+        card_views = nested_dict(card_params, "metaDataAndStats", "views")
+
+        def count(value):
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str):
+                digits = "".join(char for char in value if char.isdigit())
+                return int(digits) if digits else None
+            return None
+
+        total = count(mobile_views.get("total"))
+        today = count(mobile_views.get("today"))
+        if total is None:
+            total = count(card_views.get("total"))
+        if today is None:
+            today = count(
+                card_views.get("today")
+                or card_views.get("todayViews")
+                or card_views.get("today_views")
+            )
+
+        description = mobile.get("description")
+        description = description.strip() if isinstance(description, str) else None
+        if not description:
+            segments = nested_dict(card_params, "description").get("segments")
+            if isinstance(segments, list):
+                description = "".join(
+                    segment["text"]
+                    for segment in segments
+                    if isinstance(segment, dict)
+                    and isinstance(segment.get("text"), str)
+                )
+                description = description.replace("\u2028", "\n").strip() or None
+
+        return description or None, total, today
+
+    def _enrich_ads(self, ads: list[Item], *, views: bool, description: bool) -> list[Item]:
+        total_ads = len(ads)
+        for index, ad in enumerate(ads, start=1):
+            if self.stop_event and self.stop_event.is_set():
+                break
+            if not isinstance(ad.id, int) or isinstance(ad.id, bool):
+                logger.warning(f"Пропускаю объявление без числового ID: {ad.id}")
+                continue
+
+            try:
+                payload = self.http.fetch_item_data(ad.id)
+                self.good_request_count += 1
+            except Exception as err:
+                self.bad_request_count += 1
+                logger.warning(f"Ошибка при запросе карточки {ad.id}: {err}")
+                continue
+            try:
+                full_description, total_views, today_views = self._extract_item_details(payload)
+                if views:
+                    ad.total_views = total_views
+                    ad.today_views = today_views
+                    logger.info(
+                        f"id {ad.id} ({index}/{total_ads}) - "
+                        f"{total_views if total_views is not None else 'нет данных'} просмотров всего, "
+                        f"{today_views if today_views is not None else 'нет данных'} сегодня"
+                    )
+                if description and full_description:
+                    ad.description = full_description
+            except Exception as err:
+                logger.warning(f"Ошибка при разборе карточки {ad.id}: {err}")
+                continue
+            time.sleep(random.uniform(0.1, 0.9))
+        return ads
+
     def parse_views(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_views:
             return ads
 
         logger.info("Начинаю парсинг просмотров")
-
-        for ad in ads:
-            try:
-                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
-                if not html_code_full_page:
-                    continue
-                ad.total_views, ad.today_views = self._extract_views(html=html_code_full_page)
-                if full_desc := self._extract_description(html=html_code_full_page):
-                    ad.description = full_desc
-                delay = random.uniform(0.1, 0.9)
-                time.sleep(delay)
-            except Exception as err:
-                logger.warning(f"Ошибка при парсинге {ad.urlPath}: {err}")
-                continue
-
-        return ads
+        return self._enrich_ads(
+            ads, views=True, description=getattr(self.config, "parse_description", False)
+        )
 
     def parse_description(self, ads: list[Item]) -> list[Item]:
-        """Парсинг полного описания товара со страницы объявления (Issue #305)."""
-        if not getattr(self.config, "parse_description", False):
+        if not getattr(self.config, "parse_description", False) or self.config.parse_views:
             return ads
 
         logger.info("Начинаю парсинг полного описания")
-
-        for ad in ads:
-            # Пропускаем, если описание уже получено ранее (например, в parse_views)
-            if ad.description and len(ad.description) > 250 and not ad.description.rstrip().endswith("..."):
-                continue
-
-            try:
-                html_code_full_page = self.fetch_data(url=f"https://www.avito.ru{ad.urlPath}")
-                if not html_code_full_page:
-                    continue
-                if full_desc := self._extract_description(html=html_code_full_page):
-                    ad.description = full_desc
-                delay = random.uniform(0.1, 0.9)
-                time.sleep(delay)
-            except Exception as err:
-                logger.warning(f"Ошибка при парсинге описания {ad.urlPath}: {err}")
-                continue
-
-        return ads
+        return self._enrich_ads(ads, views=False, description=True)
 
     def parse_phone(self, ads: list[Item]) -> list[Item]:
         if not self.config.parse_phone or self.config.parse_phone:

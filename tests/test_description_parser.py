@@ -62,18 +62,17 @@ def test_parse_description_method_updates_ad():
     config = AvitoConfig(urls=["https://www.avito.ru/test"], parse_description=True)
     parser = AvitoParse.__new__(AvitoParse)
     parser.config = config
+    parser.stop_event = None
+    parser.good_request_count = 0
+    parser.bad_request_count = 0
+    parser.http = MagicMock()
+    parser.http.fetch_item_data.return_value = {
+        "success": {"mobile": {"description": "Полный текст описания товара"}}
+    }
 
-    html = """
-    <html><body>
-        <div data-marker="item-description/text">
-            Полный текст описания, который ранее обрезался кнопкой Читать полностью.
-        </div>
-    </body></html>
-    """
-    parser.fetch_data = MagicMock(return_value=html)
-
-    ad = Item(id=1, urlPath="/item_123", description="Короткое описание...")
+    ad = Item(id=123, urlPath="/item_123", description="Короткое описание...")
     result = parser.parse_description([ad])
 
-    assert len(result) == 1
-    assert result[0].description == "Полный текст описания, который ранее обрезался кнопкой Читать полностью."
+    assert result[0].description == "Полный текст описания товара"
+    assert result[0].total_views is None
+    parser.http.fetch_item_data.assert_called_once_with(123)
