@@ -44,6 +44,7 @@ class AvitoConfig:
     one_file_for_link: bool = False
     parse_views: bool = False
     parse_description: bool = False
+    parse_params: bool = False
     save_xlsx: bool = True
     use_webdriver: bool = True
     use_bypass_api: bool = False
