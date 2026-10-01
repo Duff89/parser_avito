@@ -65,6 +65,7 @@ def main(page: ft.Page):
         one_file_for_link.value = config.one_file_for_link
         parse_views.value = config.parse_views
         parse_description.value = getattr(config, "parse_description", False)
+        parse_params.value = getattr(config, "parse_params", False)
         save_xlsx.value = config.save_xlsx
         use_webdriver.value = config.use_webdriver
         use_bypass_api.value = config.use_bypass_api
@@ -113,6 +114,7 @@ def main(page: ft.Page):
             "one_file_for_link": one_file_for_link.value,
             "parse_views": parse_views.value,
             "parse_description": parse_description.value,
+            "parse_params": parse_params.value,
             "save_xlsx": save_xlsx.value,
             "use_webdriver": use_webdriver.value,
             "use_bypass_api": use_bypass_api.value,
@@ -560,6 +562,8 @@ def main(page: ft.Page):
                                     tooltip=PARSE_VIEWS_HELP)
     parse_description = ft.Checkbox(label="Парсить описание полностью", value=False,
                                     tooltip="Загружает полное описание из карточки вместо краткого анонса")
+    parse_params = ft.Checkbox(label="Парсить характеристики", value=False,
+                               tooltip=PARSE_PARAMS_HELP)
     parse_phone = ft.Checkbox(label="Парсить телефоны", value=False, on_change=check_api_key_exist,
                               tooltip=PARSE_PHONE_HELP)
 
@@ -712,6 +716,7 @@ def main(page: ft.Page):
                     ft.Row([one_time_start, one_file_for_link]),
                     ft.Row([parse_views,
                             parse_description,
+                            parse_params,
                             #parse_phone,
                             save_xlsx]),
                 ]
