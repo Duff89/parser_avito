@@ -72,8 +72,13 @@ jobs:
             --collect-all pyexcel_xlsx ^
             --collect-all pyexcel_io ^
             --collect-all openpyxl ^
+            --collect-all certifi ^
+            --collect-all curl_cffi ^
             --hidden-import playwright_stealth ^
             --hidden-import httpx ^
+            --hidden-import certifi ^
+            --hidden-import curl_cffi ^
+            --hidden-import _cffi_backend ^
             --add-data "config.toml;." ^
             --add-data "assets;assets"
 
