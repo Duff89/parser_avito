@@ -2,7 +2,18 @@ import asyncio
 import threading
 import time
 import os
+import sys
 from pathlib import Path
+
+# Инициализация путей к SSL сертификатам для предотвращения ошибки curl (77) в PyInstaller
+try:
+    from parser.http.client import get_ca_bundle
+    ca_bundle = get_ca_bundle()
+    if isinstance(ca_bundle, str) and os.path.isfile(ca_bundle):
+        os.environ.setdefault("CURL_CA_BUNDLE", ca_bundle)
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_bundle)
+except Exception:
+    pass
 
 import flet as ft
 from loguru import logger

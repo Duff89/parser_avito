@@ -1,12 +1,66 @@
 """
 Клиент для запросов парсера (curl_cffi)
 """
+import os
+import sys
 import time
 from curl_cffi import requests
 from loguru import logger
 
 from parser.cookies.base import CookiesProvider
 from parser.proxies.proxy import Proxy
+
+
+def get_ca_bundle() -> str | bool:
+    """
+    Определяет путь к бандлу SSL-сертификатов CA либо False при их отсутствии/недоступности.
+    Предотвращает сбой curl: (77) в PyInstaller-сборках (_MEIPASS) и при путях с не-ASCII символами.
+    """
+    # 1. Проверяем переменные окружения
+    for env_var in ("SSL_CERT_FILE", "CURL_CA_BUNDLE", "REQUESTS_CA_BUNDLE"):
+        path = os.environ.get(env_var)
+        if path and os.path.isfile(path):
+            return _normalize_ca_path(path)
+
+    # 2. Проверяем certifi
+    try:
+        import certifi
+        cert_path = certifi.where()
+        if cert_path and os.path.isfile(cert_path):
+            return _normalize_ca_path(cert_path)
+    except Exception:
+        pass
+
+    # 3. Проверяем распакованный каталог PyInstaller (_MEIPASS)
+    if hasattr(sys, "_MEIPASS"):
+        mei_path = os.path.join(sys._MEIPASS, "certifi", "cacert.pem")
+        if os.path.isfile(mei_path):
+            return _normalize_ca_path(mei_path)
+
+    # 4. Если бандл не найден на диске, отключаем проверку во избежание ошибки curl 77
+    logger.warning(
+        "SSL CA bundle (cacert.pem) не найден на диске. "
+        "Проверка SSL будет отключена для предотвращения ошибки curl (77)."
+    )
+    return False
+
+
+def _normalize_ca_path(path: str) -> str:
+    """Преобразует путь к сертификату в формат, совместимый с Windows libcurl."""
+    if sys.platform == "win32":
+        # Если путь содержит не-ASCII символы (например, кириллицу в имени пользователя Windows),
+        # libcurl может завершиться с ошибкой (77). Получаем короткий 8.3 путь.
+        if not all(ord(c) < 128 for c in path):
+            try:
+                import ctypes
+                buf = ctypes.create_unicode_buffer(1024)
+                if ctypes.windll.kernel32.GetShortPathNameW(path, buf, 1024) > 0:
+                    short_path = buf.value
+                    if short_path and os.path.isfile(short_path) and all(ord(c) < 128 for c in short_path):
+                        return short_path
+            except Exception:
+                pass
+    return path
 
 
 class HttpClient:
@@ -36,6 +90,7 @@ class HttpClient:
         max_retries: int = 5,
         retry_delay: int = 5,
         block_threshold: int = 3,
+        verify: str | bool | None = None,
     ):
         self.proxy = proxy
         self.cookies = cookies
@@ -43,6 +98,7 @@ class HttpClient:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.block_threshold = block_threshold
+        self.verify = get_ca_bundle() if verify is None else verify
 
         self._block_attempts = 0
         self._client = self._build_client()
@@ -64,7 +120,7 @@ class HttpClient:
         )
         is_mobile = " Mobile " in user_agent
         impersonate = fingerprint.get("impersonate") or "chrome"
-        session = requests.Session(impersonate=impersonate)
+        session = requests.Session(impersonate=impersonate, verify=self.verify)
         default_headers = {
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -138,6 +194,22 @@ class HttpClient:
 
             except requests.RequestsError as e:
                 last_exc = e
+                err_msg = str(e)
+
+                # Перехват ошибки curl: (77) - невозможно загрузить сертификаты CA
+                if (
+                    "(77)" in err_msg
+                    or "certificate verify locations" in err_msg
+                    or "trust anchors" in err_msg
+                ) and self.verify is not False:
+                    logger.warning(
+                        f"Ошибка curl (77) установки CA сертификата: {e}. "
+                        "Автоматически переключаем HttpClient на verify=False для предотвращения падения парсера."
+                    )
+                    self.verify = False
+                    self._reset_client()
+                    continue
+
                 self._block_attempts += 1
                 logger.warning(f"Request error (attempt {attempt}): {e}")
                 if self._block_attempts >= self.block_threshold:
