@@ -117,8 +117,8 @@ async def prompt_user_login(playwright: Playwright):
         browser = await chromium.launch(**launch_args)
         context = await browser.new_context(**context_args)
         page = await context.new_page()
-    except:
-        logger.error("Не удалось запустить графический браузер")
+    except Exception as e:
+        logger.error(f"Не удалось запустить графический браузер: {e}")
         return
 
     # Переходим на страницу авторизации
