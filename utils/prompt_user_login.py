@@ -95,7 +95,7 @@ def should_keep_cookie(cookie_name: str) -> bool:
 
 
 async def prompt_user_login(playwright: Playwright):
-    ensure_playwright_installed("chromium")
+    await asyncio.to_thread(ensure_playwright_installed, "chromium")
     chromium = playwright.chromium
     launch_args = {
         "headless": False,
@@ -199,6 +199,7 @@ async def prompt_user_login(playwright: Playwright):
 
 
 async def wrapper():
+    await asyncio.to_thread(ensure_playwright_installed, "chromium")
     async with async_playwright() as playwright:
         await prompt_user_login(playwright)
 

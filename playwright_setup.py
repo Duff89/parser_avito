@@ -22,6 +22,10 @@ def get_browsers_dir() -> str:
     return os.path.join(home, ".cache", "ms-playwright")
 
 
+if sys.platform == "win32":
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", get_browsers_dir())
+
+
 def _check_browser_sync(browser: str) -> bool:
     """
     Выполняет синхронную проверку наличия браузера через sync_playwright.
@@ -91,11 +95,16 @@ def ensure_playwright_installed(browser: str = "chromium"):
             try:
                 from playwright._impl._driver import compute_driver_executable, get_driver_env
 
-                driver_executable, driver_cli = compute_driver_executable()
+                driver_res = compute_driver_executable()
+                driver_cmd = list(driver_res) if isinstance(driver_res, tuple) else [driver_res]
+                run_kwargs = {"env": get_driver_env(), "check": True}
+                if sys.platform == "win32":
+                    no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                    if no_window:
+                        run_kwargs["creationflags"] = no_window
                 subprocess.run(
-                    [driver_executable, driver_cli, "install", browser],
-                    env=get_driver_env(),
-                    check=True,
+                    [*driver_cmd, "install", browser],
+                    **run_kwargs,
                 )
                 logger.info(f"Playwright браузер {browser} успешно установлен через встроенный драйвер.")
                 return

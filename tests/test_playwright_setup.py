@@ -1,5 +1,6 @@
 import asyncio
 import os
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -45,6 +46,15 @@ def test_ensure_playwright_installed_when_already_installed():
         mock_run.assert_not_called()
 
 
+def _expected_frozen_run_kwargs():
+    kwargs = {"env": {}, "check": True}
+    if sys.platform == "win32":
+        no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        if no_window:
+            kwargs["creationflags"] = no_window
+    return kwargs
+
+
 def test_ensure_playwright_installed_frozen_uses_driver(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", "AvitoParser.exe")
@@ -65,8 +75,31 @@ def test_ensure_playwright_installed_frozen_uses_driver(monkeypatch):
 
         mock_run.assert_called_once_with(
             ["node.exe", "cli.js", "install", "chromium"],
-            env={},
-            check=True,
+            **_expected_frozen_run_kwargs(),
+        )
+
+
+def test_ensure_playwright_installed_frozen_single_str_driver(monkeypatch):
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", "AvitoParser.exe")
+
+    mock_driver = MagicMock()
+    mock_driver.compute_driver_executable.return_value = "playwright.cmd"
+    mock_driver.get_driver_env.return_value = {}
+
+    with patch.dict(sys.modules, {
+        "playwright": MagicMock(),
+        "playwright._impl": MagicMock(),
+        "playwright._impl._driver": mock_driver,
+    }), \
+         patch("playwright_setup._browser_installed", return_value=False), \
+         patch("subprocess.run") as mock_run:
+
+        ensure_playwright_installed("chromium")
+
+        mock_run.assert_called_once_with(
+            ["playwright.cmd", "install", "chromium"],
+            **_expected_frozen_run_kwargs(),
         )
 
 
